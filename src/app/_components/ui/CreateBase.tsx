@@ -25,7 +25,7 @@ export function CreateBaseForm() {
         setBaseName("");
         createBase({ name: baseName }, {
             onSuccess: () => {
-                utils.base.getBases.invalidate()
+                void utils.base.getBases.invalidate()
             }
         })
     }
