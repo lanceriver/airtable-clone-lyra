@@ -1,10 +1,9 @@
 "use client"
 
 import { api } from "~/trpc/react"
-import { useEffect } from "react"
 import { CreateBaseForm } from "./CreateBase"
 import { BaseCard } from "./BaseCard"
-import { Base } from "@prisma/client"
+import type { Base } from "@prisma/client"
 
 type Props = {
     initialBases: Base[];
