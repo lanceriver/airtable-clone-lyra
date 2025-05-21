@@ -17,15 +17,26 @@ import { api } from "~/trpc/react"
 
 export function CreateBaseForm() {
     const { mutate: createBase } = api.base.createBase.useMutation();
+    const { mutate: createTable } = api.table.createTable.useMutation();
     const [baseName, setBaseName] = useState("");
+    const id = "";
     const utils = api.useUtils();
 
     const handleSubmit = () => {
         console.log("Base name: ", baseName);
         setBaseName("");
+        
         createBase({ name: baseName }, {
-            onSuccess: () => {
-                void utils.base.getBases.invalidate()
+            onSuccess: (base) => {
+                void utils.base.getBases.invalidate();
+                const seed = Math.floor(Math.random() * 1000000);
+                createTable({
+                    name: "Table 1",
+                    baseId: base.id,
+                    colCount: 4,
+                    rowCount: 5,
+                    seed: seed,
+                });
             }
         })
     }

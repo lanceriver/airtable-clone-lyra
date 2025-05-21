@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Base" ADD COLUMN     "tableCount" INTEGER NOT NULL DEFAULT 0;

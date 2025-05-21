@@ -19,19 +19,29 @@ export const baseRouter = createTRPCRouter({
                 },
             });
         }),
-        // Get all created bases by the current user
+    // Get all created bases by the current user
     getBases: protectedProcedure
         .query(async ({ ctx }) => {
             return ctx.db.base.findMany({
-                where: { ownerId: ctx.session.user.id}
-            })
+                where: { ownerId: ctx.session.user.id},
+                orderBy: { createdAt: "asc"}
+            });
         }),
-        // Delete a base by id
+    // Given a baseId, update the base name with given input
+    updateBase: protectedProcedure
+        .input(z.object({ baseId: z.string().min(1), name: z.string().min(1)}))
+        .mutation(async ({ ctx, input}) => {
+            return ctx.db.base.update({
+                where: { id: input.baseId},
+                data: {name: input.name}
+            });
+        }),
+    // Delete a base by id
     deleteBase: protectedProcedure
         .input(z.object({ baseId: z.string().min(1)}))
         .mutation(async ({ ctx, input }) => {
             return ctx.db.base.delete({
                 where: { id: input.baseId}
-            })
+            });
         })
 });

@@ -61,6 +61,67 @@ model Base {
     owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
+    tables    Table[]
+    tableCount Int     @default(0)
+}
+
+model Table {
+    id        String   @id @default(cuid())
+    name      String
+    baseId    String
+    base      Base     @relation(fields: [baseId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+    columns   Column[]
+    rows      Row[]
+    colCount  Int
+    rowCount  Int
+    seed      Int?
+
+    @@unique([baseId, name])
+}
+
+model Column {
+    position   Int      
+    id         String   @id @default(cuid())
+    name       String
+    tableId    String
+    table      Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    type       String
+    cells      Cell[]
+
+    @@unique([tableId, position])
+}
+
+model Row {
+    position   Int      
+    id         String   @id @default(cuid())
+    tableId    String
+    table      Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    createdAt  DateTime @default(now())
+    updatedAt  DateTime @updatedAt
+    cells      Cell[]
+    
+    @@unique([tableId, position])
+}
+
+model Cell {
+    id        String   @id @default(cuid())
+    rowId     String
+    columnId String
+    row       Row      @relation(fields: [rowId], references: [id], onDelete: Cascade)
+    column    Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    stringValue     String?
+    numberValue     Int?
+    @@index([stringValue])
+    @@index([numberValue])
+    @@index([rowId])
+    @@index([columnId])
 }
 
 model VerificationToken {
