@@ -1,6 +1,5 @@
 import { UserDropdown } from "./UserDropdown";
 import { Button } from "~/components/ui/button";
-import { TableListNavbar } from "./TableListNavbar";
 import Link from "next/link";
 
 type BaseNavbarProps = {

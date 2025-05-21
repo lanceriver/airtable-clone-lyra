@@ -39,10 +39,11 @@ type Table = {
     updatedAt: Date;
     colCount: number;
     rowCount: number;
+    seed: number | null;
 };
 
 export default function TableNavbar2({ baseId, initialTables, tableCount, children }: { baseId: string, initialTables: Table[], tableCount: number, children: React.ReactNode }) {
-  const [selectedTab, setSelectedTab] = useState(initialTables[0]?.name || "Table 1");
+  const [selectedTab, setSelectedTab] = useState(initialTables[0]?.name ?? "Table 1");
   const [createExpanded, setCreateExpanded] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
@@ -52,7 +53,7 @@ export default function TableNavbar2({ baseId, initialTables, tableCount, childr
       {/* Top navigation */}
       <div className="flex items-center bg-blue-600 text-white">
         {tables?.map((table) => (             
-                <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables[0].id}/>
+                <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""}/>
           ))}
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-blue-700">
           <ChevronDown className="h-4 w-4" />

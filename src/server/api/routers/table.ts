@@ -12,7 +12,7 @@ import { faker } from "@faker-js/faker";
 type DefaultTableData = {
     firstName: string;
     lastName: string;
-    number: Number;
+    number: number;
     email: string;
 }
 

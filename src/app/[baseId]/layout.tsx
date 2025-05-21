@@ -2,18 +2,19 @@
 import { BaseNavbar } from "../_components/ui/BaseNavbar";
 import { BaseSidebar } from "../_components/ui/BaseSidebar";
 import  TableNavbar2  from "../_components/ui/TableNavbar2";
-import { TableListNavbar } from "../_components/ui/TableListNavbar";
 import { db } from "~/server/db";
 
 
-type BaseLayoutProps = {
-    children: React.ReactNode;
-    params: Promise<{ baseId: string }>;
+type Params = {
+    baseId: string;
+    tableName: string;
+    tableId: string;
+    seed: number;
 }
 
-export default async function BaseLayout({ children, params }: BaseLayoutProps) {
+export default async function BaseLayout({ children, params }: {children: React.ReactNode, params: Params}) {
     console.log("BaseLayout params:", params);
-    const { baseId } = await params;
+    const { baseId } = params;
     const base = await db.base.findFirst({
         where: {
             id: baseId

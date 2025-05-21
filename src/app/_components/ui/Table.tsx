@@ -10,7 +10,7 @@ import { faker } from "@faker-js/faker";
 type DefaultTableData = {
     firstName: string;
     lastName: string;
-    number: Number;
+    number: number;
     email: string;
 }
 
@@ -49,7 +49,7 @@ export function Table(props: { data: DefaultTableData[] }) {
   const { data } = props;
   const table = useReactTable({
     data,
-    columns: columns as ColumnDef<typeof data[number], any>[],
+    columns: columns as ColumnDef<typeof data[number]>[],
     getCoreRowModel: getCoreRowModel(),
   });
 

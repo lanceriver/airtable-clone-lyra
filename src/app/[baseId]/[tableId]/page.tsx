@@ -1,11 +1,19 @@
 "use client";
-import { use } from "react";
 import { Table } from "~/app/_components/ui/Table";
 import { faker } from "@faker-js/faker";
 import { generateFakeData } from "~/app/_components/ui/Table";
 import { db } from "~/server/db";
+import { use } from "react";
 
-export default function BasePage({params} : {params: {tableName: string, tableId: string, seed: number}}) {   
+type Params = {
+    baseId: string;
+    tableName: string;
+    tableId: string;
+    seed: number;
+};
+
+export default function BasePage(props: { params: Promise<Params> }) {   
+    const params = use(props.params);
     const seed = params.seed;
     const data = generateFakeData(5, seed);
     console.log(data);

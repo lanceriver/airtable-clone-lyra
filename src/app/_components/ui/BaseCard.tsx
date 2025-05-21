@@ -40,7 +40,7 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
             console.error("Error updating base:", error);
         }
     });
-    const handleUpdate = (e) => {
+    const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
         setIsOpen(false);
         e.preventDefault();
         if (newName !== baseName) {

@@ -21,8 +21,8 @@ type TableDropdownProps = {
     baseId: string;
     tableId: string;
     tableName: string;
-    selectedTab?: string;
-    setSelectedTab?: (tab: string) => void;
+    selectedTab: string;
+    setSelectedTab: (tab: string) => void;
     tableCount: number;
     firstTableId: string;
 }
@@ -33,7 +33,7 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSele
     console.log(tableCount);
     const { mutate: deleteTable } = api.table.deleteTable.useMutation({
         onSuccess: () => {
-            utils.table.getTables.invalidate();
+            void utils.table.getTables.invalidate();
             router.push(`/${baseId}/${firstTableId}`);
         },
         onError: (error) => {
