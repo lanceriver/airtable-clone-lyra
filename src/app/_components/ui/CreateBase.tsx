@@ -19,6 +19,7 @@ export function CreateBaseForm() {
     const { mutate: createBase } = api.base.createBase.useMutation();
     const { mutate: createTable } = api.table.createTable.useMutation();
     const [baseName, setBaseName] = useState("");
+    const [tableId, setTableId] = useState("");
     const id = "";
     const utils = api.useUtils();
 
@@ -36,7 +37,14 @@ export function CreateBaseForm() {
                     colCount: 4,
                     rowCount: 5,
                     seed: seed,
-                });
+                }, {
+                    onSuccess: (table) => {
+                        void utils.table.getTables.invalidate({baseId: base.id});
+                        console.log("Table created: ", table);
+                        setTableId(table.id);
+                    }
+                }
+            );
             }
         })
     }

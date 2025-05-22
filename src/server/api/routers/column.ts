@@ -93,5 +93,17 @@ export const columnRouter = createTRPCRouter({
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update column!"});
             }
             return column;
-        })
+        }),
+    getColumns: protectedProcedure
+        .input(z.object({ tableId: z.string().min(1)}))
+        .query(async ({ ctx, input}) => {
+            const columns = await ctx.db.column.findMany({
+                where: { tableId: input.tableId},
+                orderBy: { position: "asc"}
+            });
+            if (!columns) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get columns!"})
+            }
+            return columns;
+        }),
 })

@@ -10,9 +10,11 @@ type Props = {
 }
 
 export function HomeDashboard({ initialBases }: Props) {
-    const { data: bases, isLoading } = api.base.getBases.useQuery(undefined, {
+const { data: bases, isLoading } = api.base.getBases.useQuery(undefined, {
     initialData: initialBases,
-  });
+});
+
+
     return (
         <div className="bg-gray-50">
             <h1 className="text-3xl font-semibold px-8 py-10">

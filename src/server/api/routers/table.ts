@@ -7,6 +7,7 @@ import {
 } from "~/server/api/trpc";
 
 import { faker } from "@faker-js/faker";
+import { create } from "domain";
 
 
 type DefaultTableData = {
@@ -15,6 +16,7 @@ type DefaultTableData = {
     number: number;
     email: string;
 }
+
 
 export function generateFakeData(count: number, seed: number): DefaultTableData[] {
   faker.seed(seed);
@@ -49,14 +51,79 @@ export const tableRouter = createTRPCRouter({
                     seed: input.seed,
                 },
             });
-            const data = generateFakeData(table.rowCount, table.seed ?? 0);
+            const data: DefaultTableData[] = generateFakeData(table.rowCount, table.seed ?? 0);
+            // Create the columns, using the first row of data to determine the column types.
+            const columns = data[0] ? Object.keys(data[0]).map((key) => {
+                const typedKey = key as keyof DefaultTableData;
+                return {
+                    heading: key,
+                    type: typeof data[0]![typedKey],
+                };
+            }) : [];
+            // Create the columns in the db.
+            const columnIds: string[] = [];
+            for (let i = 0; i < columns.length; i++) {
+                const column = await ctx.db.column.create({
+                    data: {
+                        tableId: table.id,
+                        position: i,
+                        name: columns[i]!.heading,
+                        type: columns[i]!.type,
+                    }
+                })
+                if (!column) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create column!"})
+                }
+                columnIds.push(column.id);
+            }
+            // Create DB rows
+            for (let i = 0; i < table.rowCount; i++) {
+                const row = await ctx.db.row.create({
+                    data: {
+                        position: i,
+                        tableId: table.id
+                    }
+                })
+                if (!row) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create row!"})
+                }
+                // Create DB cells
+                for (let j = 0; j < columns.length; j++) {
+                    const cellData = data[i]![columns[j]!.heading as keyof DefaultTableData];
+                    const cellValue: string | number | boolean = cellData;
+                    let stringValue: string | undefined;
+                    let numberValue: number | undefined;
+                    if (typeof cellValue === "string") {
+                        stringValue = cellValue;
+                    }
+                    else if (typeof cellValue === "number") {
+                        numberValue = cellValue;
+                    }
+                    const columnId = columnIds[j];
+                    if (!columnId) {
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Invalid columnId!" });
+                    }
+                    const cell = await ctx.db.cell.create({
+                        data: {
+                            rowId: row.id,
+                            columnId: columnId,
+                            stringValue: stringValue,
+                            numberValue: numberValue,
+                        }
+                    })
+                    if (!cell) {
+                        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create cell!"});
+                    }
+                }
+            }
             await ctx.db.base.update({
                 where: { id: input.baseId},
                 data: {
                     tableCount: {
-                        increment: 1}
+                        increment: 1
+                    }
                 }
-            })
+            });
             return table;
         }),
     getTables: protectedProcedure

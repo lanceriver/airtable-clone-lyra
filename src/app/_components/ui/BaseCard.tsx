@@ -27,6 +27,13 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
     const [isOpen, setIsOpen] = useState(false);
     const utils = api.useUtils();
     const inputRef = useRef<HTMLInputElement>(null);
+    const [defaultTable, setDefaultTable] = useState("");
+    const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId });
+    useEffect(() => {
+        if (tables && tables.length > 0) {
+            setDefaultTable(tables[0]!.id);
+    }
+    }, [tables]);
     useEffect(() => {
     if (isEditing && inputRef.current) {
         inputRef.current.focus();
@@ -47,6 +54,7 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
             void updateBase({baseId, name: newName});
         }
     }
+    console.log("BaseCard render", { baseId, defaultTable, baseName });
     const { mutate: deleteBase } = api.base.deleteBase.useMutation({
         onSuccess: () => {
             void utils.base.getBases.invalidate();
@@ -72,8 +80,10 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
     return (
         <div className="relative group bg-white shadow-2xs border rounded-md ml-8 mr-8 p-4 my-5 flex items-center hover:shadow-lg transition-shadow duration-200">
             {!isEditing && (
-                <Link href={`/${baseId}?name=${encodeURIComponent(newName)}`} className="absolute inset-0" />
-            )}
+            <Link href={`/${baseId}/${defaultTable}`} className="absolute inset-0" />
+            )
+            }
+            
             <div className="w-15 h-15 bg-purple-500 rounded-md text-white text-2xl font-normal flex items-center justify-center flex-shrink-0">
                 {baseName.slice(0, 1).toUpperCase()}
                 {baseName.slice(1, 2)}

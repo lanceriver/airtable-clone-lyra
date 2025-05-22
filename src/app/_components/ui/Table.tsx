@@ -6,8 +6,9 @@ import {
 } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { faker } from "@faker-js/faker";
+import type { RowData } from "~/app/[baseId]/[tableId]/page";
 
-type DefaultTableData = {
+export type DefaultTableData = {
     firstName: string;
     lastName: string;
     number: number;
@@ -24,7 +25,7 @@ export function generateFakeData(count: number, seed: number): DefaultTableData[
   }));
 }
 
-const columnHelper = createColumnHelper<DefaultTableData>();
+/* const columnHelper = createColumnHelper<DefaultTableData>();
 
 const columns = [
   columnHelper.accessor("firstName", {
@@ -43,13 +44,13 @@ const columns = [
     header: () => <span>Email</span>,
     cell: info => info.getValue(),
   }),
-]
+] */
 
-export function Table(props: { data: DefaultTableData[] }) {
+export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData>[] }) {
   const { data } = props;
   const table = useReactTable({
-    data,
-    columns: columns as ColumnDef<typeof data[number]>[],
+    data: props.rows,
+    columns: props.columns,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -71,7 +72,7 @@ export function Table(props: { data: DefaultTableData[] }) {
       <tbody>
         {table.getRowModel().rows.length === 0 ? (
           <tr>
-            <td colSpan={columns.length} className="text-center py-4 text-gray-400">
+            <td colSpan={props.columns.length} className="text-center py-4 text-gray-400">
               No data
             </td>
           </tr>

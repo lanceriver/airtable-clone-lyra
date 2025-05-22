@@ -110,7 +110,8 @@ model Row {
 model Cell {
     id        String   @id @default(cuid())
     rowId     String
-    columnId String
+    columnId    String
+    parentColumn String
     row       Row      @relation(fields: [rowId], references: [id], onDelete: Cascade)
     column    Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
     createdAt DateTime @default(now())

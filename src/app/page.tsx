@@ -28,6 +28,8 @@ export default async function Home() {
   });
 
   const bases = await helpers.base.getBases.fetch()
+  const baseIds = bases.map((base) => base.id);
+  console.log("Bases: ", bases);
 
   return (
     <HydrateClient>
