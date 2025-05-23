@@ -122,6 +122,7 @@ model Cell {
     @@index([numberValue])
     @@index([rowId])
     @@index([columnId])
+    @@unique([rowId, columnId])
 }
 
 model VerificationToken {

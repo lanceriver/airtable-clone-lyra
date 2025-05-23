@@ -42,6 +42,23 @@ export const rowRouter = createTRPCRouter({
         }
         return row;
     }),
+    // Mainly used to get the row data for a specific row, including all the cells in that row.
+    queryRow: protectedProcedure
+    .input(z.object({ rowId: z.string().min(1)}))
+    .query(async ({ ctx, input}) => {
+        const row = await ctx.db.row.findUnique({
+            where: {
+                id: input.rowId
+            },
+            include: {
+                cells: true
+            }
+        })
+        if (!row) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get row!"})
+        }
+        return row;
+    }),
     // Construct table data from rows and columns to send to the client, makes it easier to render the table.
     getRows: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(100), offset: z.number().min(0)}))
@@ -52,7 +69,7 @@ export const rowRouter = createTRPCRouter({
             },
             include: {
                 cells: true },
-            take: input.count,
+            take: input.count + 1,
             skip: input.offset,
             orderBy: {
                 position: "asc"
@@ -61,7 +78,6 @@ export const rowRouter = createTRPCRouter({
         if (!rows) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
         }
-        console.log("rows are:",rows);
         return rows;
     }),
     deleteRow: protectedProcedure

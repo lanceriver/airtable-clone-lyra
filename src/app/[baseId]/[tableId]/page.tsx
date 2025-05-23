@@ -8,7 +8,11 @@ import { api } from "~/trpc/react";
 import {
   createColumnHelper
 } from "@tanstack/react-table"; 
-import { useMemo } from "react";
+import { useMemo, useState, useEffect } from "react";
+import { set } from "zod";
+import { TableCell } from "~/app/_components/ui/Table";
+
+// Dynamically generate column defs based on shape of data returned from backend, should make it more scalable
 
 type Params = {
     baseId: string;
@@ -47,24 +51,7 @@ type ColumnData = {
 
 const columnHelper = createColumnHelper<ColumnData>();
 
-/* const columns = [
-  columnHelper.accessor("firstName", {
-    header: () => <span>First Name</span>,
-    cell: info => info.getValue(),
-  }),
-  columnHelper.accessor("lastName", {
-    header: () => <span>Last Name</span>,
-    cell: info => info.getValue(),
-  }),
-  columnHelper.accessor("number", {
-    header: () => <span>Number</span>,
-    cell: info => info.getValue(),
-  }),
-  columnHelper.accessor("email", {
-    header: () => <span>Email</span>,
-    cell: info => info.getValue(),
-  }),
-] */
+
 
 export default function BasePage(props: { params: Promise<Params> }) {   
     const params = use(props.params);
@@ -88,7 +75,14 @@ export default function BasePage(props: { params: Promise<Params> }) {
         return <div>Loading...</div>;
     }
     const rowMap = new Map<string, string>();
-    const tableColumns = columns?.map((column => ({
+    const tableColumns = [];
+    const idColumn = {
+            id: "id",
+            accessorFn: (row: RowData) => row.position,
+            header: () => <span></span>,
+        };
+    tableColumns.push(idColumn);
+    const returnedColumns = columns?.map((column => ({
         id: column.id,
         accessorFn: (row: RowData) => {
             const cell = row.cells?.find((cell: Record<string,unknown>) => cell.columnId === column.id);
@@ -100,13 +94,16 @@ export default function BasePage(props: { params: Promise<Params> }) {
             }
            /*  return cell?.value ?? console.log(cell.value); */ // fallback to empty string
         },
+        cell: TableCell,
         header: () => <span>{columnMap.get(column.id)}</span>,
     })));
+    if (returnedColumns) {
+        tableColumns.push(...returnedColumns);
+    }
     console.log("The table columns are: ", tableColumns);
     return (
         <div>
-            This table is for {tableId}
-            <Table data={data} rows={rows ?? []} columns={tableColumns ?? []} />
+            <Table data={data} rows={rows ?? []} columns={tableColumns ?? []} tableId={tableId}/>
         </div>
     )
 }

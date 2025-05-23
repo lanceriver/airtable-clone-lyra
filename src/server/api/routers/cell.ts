@@ -26,13 +26,16 @@ export const cellRouter = createTRPCRouter({
         return cell;
     }),
     updateCell: protectedProcedure
-    .input(z.object({id: z.string().min(1), stringValue: z.string().optional(),
-        numberValue: z.number().optional()
+    .input(z.object({id: z.string().min(1).optional(), stringValue: z.string().optional(),
+        numberValue: z.number().optional(), rowId: z.string().min(1), columnId: z.string().min(1)
     }))
     .mutation(async ({ ctx, input}) => {
         const cell = await ctx.db.cell.update({
             where: {
-                id: input.id
+                rowId_columnId: {
+                    rowId: input.rowId,
+                    columnId: input.columnId
+                }
             },
             data: {
                 ...(input.stringValue !== undefined ? {stringValue: input.stringValue} : {}),

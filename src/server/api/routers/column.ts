@@ -48,6 +48,75 @@ export const columnRouter = createTRPCRouter({
             }
             return column;
         }),
+    createNewColumn: protectedProcedure.input(z.object({ tableId: z.string().min(1), position: z.number(),
+            name: z.string().min(1), type: z.string().min(1)
+        }))
+        .mutation(async ({ctx, input}) => {
+            const existing = await ctx.db.column.findFirst({
+                where: {
+                    tableId: input.tableId,
+                    name: input.name
+                }
+            })
+            if (existing) {
+                throw new TRPCError({ code: "CONFLICT", message: "Column name must be unique!"})
+            }
+            const column = await ctx.db.column.create({
+                data: {
+                    position: input.position,
+                    name: input.name,
+                    tableId: input.tableId,
+                    type: input.type
+                }
+            })
+            if (!column) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create column!"})
+            }
+            const parentTable = await ctx.db.table.findFirst({
+                where: {
+                    id: input.tableId
+                }
+            });
+            if (!parentTable) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to find parent table!"})
+            };
+            const rows = await ctx.db.row.findMany({
+                where: {
+                    tableId: input.tableId
+                },
+                select: {
+                    id: true,
+                },
+            });
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to find rows!"})
+            };
+            const cells = await ctx.db.cell.createMany({
+                data: rows.map((row) => ({
+                    rowId: row.id,
+                    columnId: column.id,
+                    stringValue: undefined,
+                    numberValue: undefined,
+                })),
+            });
+            if (!cells) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create cells!"});
+            }
+            const updateCount = await ctx.db.table.update({
+            where: {
+                id: input.tableId
+            },
+            data: {
+                colCount: {
+                    increment: 1
+                }
+            }
+            });
+            if (!updateCount) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update count!"})
+            }
+            return column;
+        }),
     deleteColumn: protectedProcedure
         .input(z.object({ tableId: z.string().min(1), columnId: z.string().min(1)
         }))

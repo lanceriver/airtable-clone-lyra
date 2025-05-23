@@ -116,6 +116,45 @@ export const tableRouter = createTRPCRouter({
                     }
                 }
             }
+            // Create an additional empty row
+            const extraRow = await ctx.db.row.create({
+            data: {
+                position: table.rowCount, // one after the last index
+                tableId: table.id,
+            }
+            });
+
+            if (!extraRow) {
+            throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to create extra row!",
+            });
+            }
+            // Create empty cells in the extra row
+            for (let j = 0; j < columns.length; j++) {
+                const columnId = columnIds[j];
+                if (!columnId) {
+                    throw new TRPCError({
+                            code: "INTERNAL_SERVER_ERROR",
+                            message: "Invalid columnId!",
+                });
+            }
+            const emptyCell = await ctx.db.cell.create({
+                data: {
+                rowId: extraRow.id,
+                columnId: columnId,
+                stringValue: null,
+                numberValue: null,
+                },
+            });
+            if (!emptyCell) {
+                throw new TRPCError({
+                code: "INTERNAL_SERVER_ERROR",
+                message: "Failed to create empty cell in extra row!",
+                });
+            }
+            }
+            // Update the base table count      
             await ctx.db.base.update({
                 where: { id: input.baseId},
                 data: {
