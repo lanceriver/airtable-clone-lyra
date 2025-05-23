@@ -28,7 +28,7 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
     const [deleteOpen, setDeleteOpen] = useState(false);
     const { mutate: deleteColumn } = api.column.deleteColumn.useMutation({
         onSuccess: () => {
-            utils.column.getColumns.invalidate();
+            void utils.column.getColumns.invalidate();
             setDeleteOpen(false);
         },
         onError: (error) => {

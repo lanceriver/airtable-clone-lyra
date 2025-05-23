@@ -11,6 +11,7 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { set } from "zod";
 import { TableCell } from "~/app/_components/ui/Table";
+import type { CellContext } from "@tanstack/react-table";
 
 // Dynamically generate column defs based on shape of data returned from backend, should make it more scalable
 
@@ -32,14 +33,6 @@ export type RowData = {
         stringValue?: string | null;
         numberValue?: number | null;
     }[];
-}
-
-type ExtendedRowData = RowData & Record<string, unknown>;
-
-type TableData = {
-    id: string;
-    name: string;
-    rows: RowData[];
 }
 
 type ColumnData = {
@@ -92,7 +85,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
             if (cell?.numberValue) {    
                 return cell.numberValue;
             }
-           /*  return cell?.value ?? console.log(cell.value); */ // fallback to empty string
+            return "";
         },
         cell: TableCell,
         header: () => <span>{columnMap.get(column.id)}</span>,

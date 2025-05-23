@@ -32,7 +32,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
     const [error, setError] = useState(false);
     const { mutate: createNewColumn } = api.column.createNewColumn.useMutation({
             onSuccess: () => {
-              utils.column.getColumns.invalidate();
+              void utils.column.getColumns.invalidate();
               setDialogOpen(false);
               setColumnName("");
              console.log("Column createed");
