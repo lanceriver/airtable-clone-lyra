@@ -154,6 +154,14 @@ export const tableRouter = createTRPCRouter({
                 });
             }
             }
+            await ctx.db.table.update({
+                where: { id: table.id },
+                data: {
+                    rowCount: {
+                        increment: 1 // Increment the row count by 1 for the extra row
+                    }
+                }
+            }); 
             // Update the base table count      
             await ctx.db.base.update({
                 where: { id: input.baseId},

@@ -28,12 +28,13 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
     const utils = api.useUtils();
     const [columnName, setColumnName] = useState("");
     const [columnType, setColumnType] = useState("string"); 
-    const [dialogOpen, setDialogOpen] = useState(false);
+    const [createDialogOpen, setCreateDialogOpen] = useState(false);
+    const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [error, setError] = useState(false);
     const { mutate: createNewColumn } = api.column.createNewColumn.useMutation({
             onSuccess: () => {
               void utils.column.getColumns.invalidate();
-              setDialogOpen(false);
+              setCreateDialogOpen(false);
               setColumnName("");
              console.log("Column createed");
             },
@@ -50,6 +51,16 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
             type: type
         });
       }
+      const { mutate: editColumn } = api.column.editColumn.useMutation({
+        onSuccess: () => {
+          void utils.column.getColumns.invalidate();
+          setEditDialogOpen(false);
+          setColumnName("");
+        },
+        onError: (error) => {
+            setError(true);
+        }
+      })
       useEffect(() => {
         if (error) {
         toast("Please enter a valid and unique column name.");
@@ -66,12 +77,12 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
-                <DropdownMenuItem onClick={() => setDialogOpen(true)}>
+                <DropdownMenuItem onClick={() => setCreateDialogOpen(true)}>
                             Add Column
                 </DropdownMenuItem>
                 </DropdownMenuContent>
         </DropdownMenu>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
                     <DialogContent>
                         <DialogHeader>
                             <DialogTitle>
@@ -95,7 +106,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                                     <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, "string")}>Save changes</Button>
                             </DialogFooter>
                             </DialogContent>
-                            </Dialog>
+                        </Dialog>
         </>
         
     )

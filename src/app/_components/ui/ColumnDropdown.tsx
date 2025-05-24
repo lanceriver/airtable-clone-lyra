@@ -26,6 +26,8 @@ import { api } from "~/trpc/react";
 export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: string, columnName: string, tableId: string }) {
     const utils = api.useUtils();
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    const [name, setName] = useState("")
     const { mutate: deleteColumn } = api.column.deleteColumn.useMutation({
         onSuccess: () => {
             void utils.column.getColumns.invalidate();
@@ -38,6 +40,18 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
     const handleDelete = () => {
         deleteColumn({ columnId: columnId, tableId: tableId});
     }
+    const { mutate: editColumn } = api.column.editColumn.useMutation({
+        onSuccess: () => {
+            void utils.column.getColumns.invalidate();
+            setEditOpen(false);
+        },
+        onError: (error) => {
+            console.error("Error editing column:", error);
+        }
+    });
+    /* const handleEdit = ({}) => {
+        editColumn({columnId: columnId, tableId: tableId, newName: newName})
+    } */
     return (
         <div>
              <DropdownMenu>
@@ -75,6 +89,26 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
                     </DialogHeader>
                 </DialogContent>
             </Dialog>
+            {/* <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            Delete Column
+                        </DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to delete column {columnName}?
+                        </DialogDescription>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button variant="destructive" onClick={() => handleDelete()}>
+                                Delete
+                            </Button>
+                        </DialogFooter>
+                    </DialogHeader>
+                </DialogContent>
+            </Dialog> */}
         </div>
     )
 }

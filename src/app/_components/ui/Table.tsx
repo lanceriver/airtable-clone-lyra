@@ -10,6 +10,14 @@ import type { RowData } from "~/app/[baseId]/[tableId]/page";
 import React, { useState, useEffect } from "react";
 import { api } from "~/trpc/react";
 import { CreateColumn } from "./CreateColumn";
+import { Plus } from "lucide-react";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "~/components/ui/context-menu"
+
 export type DefaultTableData = {
     firstName: string;
     lastName: string;
@@ -18,6 +26,8 @@ export type DefaultTableData = {
 }
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
+import { set } from "zod";
+import { Rowdies } from "next/font/google";
 
 type TableCellProps = {
   getValue: () => string | number;
@@ -56,9 +66,6 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
     useEffect(() => {
         setValue(initialValue);
     }, [initialValue]);
-    console.log("column id: ", column.id);
-    console.log("row id: ", row.id);
-    console.log("value: ", value);
     const onBlur = () => {
         table.options.meta?.updateData(row.index, column.id, value);
         if (value !== initialValue) {
@@ -74,6 +81,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
         e.preventDefault();
         if (value !== initialValue) {
             if (typeof value === "string") {
+                console.log("rowId: :", row.id, "columnId: ", column.id, "value: ", value);
                 updateCell({ rowId: row.id, columnId: column.id, stringValue: value });
             }
             else if (typeof value === "number") {
@@ -96,6 +104,11 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
 export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string }) {
   const [ data, setData] = useState(() => [...props.rows]);
+  const [dropdownCell, setDropdownCell] = useState<{
+    cellId: string;
+    rowId: string;
+    columnId: string;
+  } | null>(null);
   const utils = api.useUtils();
   const table = useReactTable({
     data: props.rows,
@@ -103,6 +116,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
     columnResizeMode: "onChange",
     getRowId: originalRow => originalRow.id,
     getCoreRowModel: getCoreRowModel(),
+    rowCount: props.rows.length,
     meta: {
       updateData: (rowIndex: number, columnId: string, value: unknown) => {
         setData((old) =>
@@ -128,7 +142,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
             console.error("Error creating column:", error);
         }
     })
-  const handleCreate = (tableId: string, position: number, name: string, type: string) => {
+  const handleCreateColumn = (tableId: string, position: number, name: string, type: string, operation: string) => {
     createNewColumn({
         tableId: tableId,
         position: position,
@@ -136,6 +150,37 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
         type: type
     });
   }
+  const handleCreateRow = (direction?: string, position?: number) => {
+    let fnPosition = props.rows.length;
+    if (position) {
+      fnPosition = position;
+    }
+    createRow({ tableId: props.tableId, position: fnPosition, direction: direction});
+  }
+  const { mutate: createRow } = api.row.createRow.useMutation({
+    onSuccess: () => {
+      void utils.row.getRows.invalidate();
+      console.log("Row created");
+    },
+    onError: (error) => {
+      console.error("Error creating row:", error);
+    }
+  })
+  const { mutate: deleteRow } = api.row.deleteRow.useMutation({
+    onSuccess: () => {
+      void utils.row.getRows.invalidate();
+      console.log("Row deleted");
+    },
+    onError: (error) => {
+      console.error("Error deleting row", error);
+    }
+  })
+  const handleDeleteRow = (tableId: string, rowId: string) => {
+    deleteRow({
+      tableId: tableId,
+      rowId: rowId
+    })
+  };
   const { rows } = table.getRowModel();
   console.log("columns length: ", props.columns.length);
   return (
@@ -176,22 +221,42 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
             </td>
           </tr>
         ) : (
-          table.getRowModel().rows.map(row => (
+          table.getRowModel().rows.map((row, idx, arr) => (
             <tr key={row.id}>
-              {row.getVisibleCells().map(cell => (
-                <td key={cell.id} className="border px-2 py-1">
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
+              {row.getVisibleCells().map((cell, colIdx) => (
+              <ContextMenu key={cell.id}>
+                <ContextMenuTrigger asChild>
+                  <td key={cell.id} className="border px-2 py-1">
+                        {idx === arr.length - 1
+                          ? (colIdx === 0 
+                            ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>
+                            : flexRender(cell.column.columnDef.cell, cell.getContext()))
+                          : flexRender(cell.column.columnDef.cell, cell.getContext())
+                        }
+                  </td>
+                </ContextMenuTrigger>
+                    <ContextMenuContent>
+                <ContextMenuItem /* onClick={() => handleCreateRow("up", idx + 1)} */>
+                  Insert row above
+                </ContextMenuItem>
+                <ContextMenuItem /* onClick={() => handleCreateRow("down", idx + 1)} */>
+                  Insert row below
+                </ContextMenuItem>
+                <ContextMenuItem onClick={() => handleDeleteRow(props.tableId, row.id)}>
+                  Delete row
+                </ContextMenuItem>
+              </ContextMenuContent>
+              </ContextMenu>
               ))}
             </tr>
           ))
         )}
-        {/* Removed erroneous <tr key={rows.id}></tr> */}
       </tbody>
     </table>
     <div>
-      <CreateColumn tableId={props.tableId} colCount={props.columns.length}/>
+        <CreateColumn tableId={props.tableId} colCount={props.columns.length}/>
     </div>
+    
 {/*     <pre>{JSON.stringify(data, null, "\t")}</pre> */}
     </div>
   );

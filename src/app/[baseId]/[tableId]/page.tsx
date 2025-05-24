@@ -62,7 +62,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
                 return column.id;
             });
     console.log("mAP IS: ", columnMap);
-    const { data: rows, isLoading: isRowsLoading } = api.row.getRows.useQuery({ tableId, count: 5, offset: 0});
+    const { data: rows, isLoading: isRowsLoading } = api.row.getRows.useQuery({ tableId, count: 100, offset: 0});
     console.log("Rows are: ", rows);
     if (isColumnsLoading || isRowsLoading) {
         return <div>Loading...</div>;
@@ -87,6 +87,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
             }
             return "";
         },
+        type: column.type,
         cell: TableCell,
         header: () => <span>{columnMap.get(column.id)}</span>,
     })));
