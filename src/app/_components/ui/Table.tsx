@@ -191,9 +191,9 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
           <tr key={headerGroup.id}>
             {headerGroup.headers.map(header => (
               <React.Fragment key={header.id}>
-                <th className="border px-2 py-1 bg-gray-100">
+                <th className="border px-2 bg-gray-100 min-w-2 max-w-4">
                 {header.isPlaceholder ? null : (
-                <div className="flex justify-between items-center gap-2">
+                <div className="flex justify-between items-center gap-2 text-xs font-normal py-2">
                 {flexRender(header.column.columnDef.header, header.getContext())}
                 {header.index !== 0 && (
                   <ColumnDropdown
@@ -226,7 +226,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
               {row.getVisibleCells().map((cell, colIdx) => (
               <ContextMenu key={cell.id}>
                 <ContextMenuTrigger asChild>
-                  <td key={cell.id} className="border px-2 py-1">
+                  <td key={cell.id} className="border px-2 py-1 text-xs">
                         {idx === arr.length - 1
                           ? (colIdx === 0 
                             ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>

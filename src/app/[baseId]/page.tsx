@@ -1,6 +1,5 @@
 "use client"
 import { use } from "react";
-import TableNavbar from "~/app/_components/ui/TableNavbar";
 import TableSidebar from "../_components/ui/TableSidebar";
 import { useSearchParams } from "next/navigation";
 

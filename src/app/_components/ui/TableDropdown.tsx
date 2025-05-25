@@ -45,23 +45,24 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSele
     }
     return (
         <div className="flex flex-row items-center">
-            <Link href={`/${baseId}/${tableId}`} className="text-sm text-gray-600 hover:text-blue-500">
+            <Link href={`/${baseId}/${tableId}`} className="text-xs text-gray-600 hover:text-blue-500">
                 <Button
                     variant="ghost"
                     className={cn(
-                    "px-4 py-2 h-10 rounded-none text-white hover:text-white",
-                    selectedTab === "Table 1" ? "bg-blue-700" : "hover:bg-blue-700",
+                    "px-4 py-2 h-10 text-black hover:text-white rounded-none",  
+                    selectedTab === tableName ? "bg-white text-blue-700" : "text-white hover:bg-blue-700 hover:text-white",
                 )}
                     onClick={() => setSelectedTab(tableName)}
                 >
                     {tableName}
                 </Button>
             </Link>
-                <DropdownMenu>
+            {selectedTab === tableName && (
+            <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <Button variant="ghost">
-                        <ChevronDown className="text-white ml-1 h-4 w-4" />
-                    </Button>
+                    <button className="bg-white h-10 px-2 flex items-center border-blue-100">
+                            <ChevronDown className="text-gray-500 ml-1 h-4 w-4" />
+                    </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                 <DropdownMenuItem>
@@ -77,7 +78,10 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSele
                     </Button>
                 </DropdownMenuItem>
                 </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenu>
+                )}
+            
+                
         </div>
     )
 }

@@ -30,7 +30,7 @@ export default async function BaseLayout({ children, params }: {children: React.
     const tableCount = tables.length;
     return (
         <div>
-            <BaseNavbar baseId={base.id} baseName={base.name} />
+            <BaseNavbar baseId={base.id} baseName={base.name}/>
                 <TableNavbar2 baseId={baseId} initialTables={tables} tableCount={tableCount}>
                     {children}
                 </TableNavbar2>

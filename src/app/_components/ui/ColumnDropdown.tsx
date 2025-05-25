@@ -55,10 +55,10 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
     return (
         <div>
              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-none bg-gray-400">
-                    <ChevronDown className="mr-2 h-4 w-4 justify-center" />
-                </Button>
+                <DropdownMenuTrigger asChild>   
+                        <button className="mr-2 h-4 w-4 flex items-center justify-center cursor-pointer">
+                            <ChevronDown className="h-4 w-4" />
+                        </button>    
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
                     <DropdownMenuItem>

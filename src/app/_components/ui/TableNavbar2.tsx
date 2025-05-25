@@ -49,18 +49,19 @@ export default function TableNavbar2({ baseId, initialTables, tableCount, childr
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col h-screen">
       {/* Top navigation */}
-      <div className="flex items-center bg-blue-600 text-white">
+      <div className="flex items-center bg-red-600 text-black font-normal py-0">
         {tables?.map((table) => (             
                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""}/>
           ))}
+
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-blue-700">
           <ChevronDown className="h-4 w-4" />
         </Button>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-blue-700">
+              <Button variant="ghost" size="icon" className="h-10 w-10 text-white  hover:bg-blue-700">
                   <Plus className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
