@@ -20,9 +20,10 @@ export function ColorPicker({selectedColor, setSelectedColor, colorOptions, base
                     </div>
                     <div className="flex flex-row">
                         {colorOptions.map((color) => (
+                            console.log(color),
                         <button
                        key={color}
-                       style={{ backgroundColor: color, width: 24, height: 24, borderRadius: "50%", margin: 4, border: selectedColor === color ? "2px solid #000" : "1px solid #ccc" }}
+                       className={`${color} w-6 h-6 rounded-full m-1 border-2 ${selectedColor === color ? "border-black" : "border-gray-300"}`}
                        onClick={() => setSelectedColor(color)}
                        aria-label={`Select color ${color}`}
                         />

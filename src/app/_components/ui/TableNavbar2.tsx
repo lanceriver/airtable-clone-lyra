@@ -42,16 +42,25 @@ type Table = {
     seed: number | null;
 };
 
-export default function TableNavbar2({ baseId, initialTables, tableCount, children }: { baseId: string, initialTables: Table[], tableCount: number, children: React.ReactNode }) {
+export default function TableNavbar2({ baseId, initialTables, tableCount, children, navbarColor }: { baseId: string, initialTables: Table[], tableCount: number, children: React.ReactNode, navbarColor?: string }) {
   const [selectedTab, setSelectedTab] = useState(initialTables[0]?.name ?? "Table 1");
   const [createExpanded, setCreateExpanded] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
+  const colorOptions = [
+        "bg-blue-700/90",
+        "bg-red-700/90",
+        "bg-green-700/90",
+        "bg-white-700/90",
+        "bg-orange-700/90",
+        "bg-yellow-700/90",
+        "bg-purple-700/90"
+    ];      
   return (
     <div className="flex flex-col h-screen">
       {/* Top navigation */}
-      <div className="flex items-center bg-red-600 text-black font-normal py-0">
+      <div className="flex items-center bg-blue-700/90  text-black font-normal py-0">
         {tables?.map((table) => (             
                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""}/>
           ))}

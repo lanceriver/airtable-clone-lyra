@@ -47,4 +47,16 @@ export const cellRouter = createTRPCRouter({
         }
         return cell;
     }),
+    sortCell: protectedProcedure
+    .input(z.object({rowId: z.string().min(1), columnId: z.string().min(1), order: z.string().min(1)}))
+    .mutation(async ({ ctx, input}) => {
+        const cell = await ctx.db.cell.findMany({
+            where: {
+                columnId: input.columnId,
+            },
+            orderBy: {
+                
+            }
+        })
+    })
 });

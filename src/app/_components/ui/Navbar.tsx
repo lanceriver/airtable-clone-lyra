@@ -14,6 +14,7 @@ export function Navbar({ userName, userImage }: UserProps  ) {
             <div className="items-center">
                 <Input className="rounded-full" type="search" placeholder="Search..."/>
             </div>
+            
             <div>
                 <UserDropdown userName={userName} userImage={userImage} />  
             </div>

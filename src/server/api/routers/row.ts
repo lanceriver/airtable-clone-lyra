@@ -163,5 +163,35 @@ export const rowRouter = createTRPCRouter({
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update count!"})
         }
         return deleted;
+    }),
+    sortRows: protectedProcedure
+    .input(z.object({ columnId: z.string().min(1), order: z.string().min(1)}))
+    .query(async ({ ctx, input}) => {
+        const cells = await ctx.db.cell.findMany({
+            where: {
+                columnId: input.columnId,
+            },
+            orderBy: {
+                ...(input.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
+            }
+        })
+        if (!cells) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get cells!"})
+        }
+        const rowIds = cells.map(cell => cell.rowId);
+        const rows = await ctx.db.row.findMany({
+            where: {
+                id: { in: rowIds }
+            },
+            include: {
+                cells: true
+            }
+        })
+        if (!rows) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+        }
+        const rowMap = new Map(rows.map(row => [row.id, row]));
+        const sortedRows = rowIds.map(id => rowMap.get(id)).filter(Boolean);
+        return sortedRows;
     })
 })

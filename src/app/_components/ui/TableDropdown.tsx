@@ -49,8 +49,8 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSele
                 <Button
                     variant="ghost"
                     className={cn(
-                    "px-4 py-2 h-10 text-black hover:text-white rounded-none",  
-                    selectedTab === tableName ? "bg-white text-blue-700" : "text-white hover:bg-blue-700 hover:text-white",
+                    "px-4 py-2 h-10 hover:text-white rounded-none",  
+                    selectedTab === tableName ? "bg-white text-black" : "text-white hover:bg-black",
                 )}
                     onClick={() => setSelectedTab(tableName)}
                 >

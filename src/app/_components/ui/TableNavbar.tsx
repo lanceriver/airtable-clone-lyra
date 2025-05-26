@@ -27,7 +27,7 @@ export default function TableNavbar() {
   return (
     <div className="flex flex-col h-screen bg-white">
       {/* Top navigation */}
-      <div className="flex items-center bg-blue-600 text-white">
+      <div className="flex items-center bg-yellow-300 text-white">
         <button
           className={cn(
             "px-4 py-2 text-sm font-medium flex items-center",

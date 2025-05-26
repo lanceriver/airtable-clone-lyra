@@ -102,7 +102,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
     )
 };
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string }) {
+export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string, sort: { columnId: string; order: "asc" | "desc" } | null }) {
   const [ data, setData] = useState(() => [...props.rows]);
   const [dropdownCell, setDropdownCell] = useState<{
     cellId: string;
@@ -181,17 +181,20 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
       rowId: rowId
     })
   };
+  
   const { rows } = table.getRowModel();
   console.log("columns length: ", props.columns.length);
   return (
-    <div className="flex flex-row">
-      <table className="min-w-3/4 border">
-      <thead>
+    <div className="flex flex-row w-full overflow-y-hidden">
+      <table className="min-w-max border">
+      <thead className="sticky top-0">
         {table.getHeaderGroups().map(headerGroup => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map(header => (
               <React.Fragment key={header.id}>
-                <th className="border px-2 bg-gray-100 min-w-2 max-w-4">
+                <ContextMenu>
+                  <ContextMenuTrigger asChild>
+                    <th className="border px-2 bg-gray-100 min-w-2 max-w-4 sticky top-0 z-10">
                 {header.isPlaceholder ? null : (
                 <div className="flex justify-between items-center gap-2 text-xs font-normal py-2">
                 {flexRender(header.column.columnDef.header, header.getContext())}
@@ -201,11 +204,21 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
                   columnName={header.column.columnDef.header as string}
                   tableId={props.tableId}
                   />
-                )}
-                
+                )}   
                 </div>
                 )}
                 </th>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem onClick={() => setSort({columnId: header.column.id, order: "asc"})}>
+                      Sort A-Z
+                    </ContextMenuItem>
+                    <ContextMenuItem onClick={() => setSort({columnId: header.column.id, order: "desc"})}>
+                      Sort Z-A
+                    </ContextMenuItem>
+                  </ContextMenuContent>
+                </ContextMenu>
+                
               </React.Fragment>
               
             ))}
@@ -256,8 +269,6 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
     <div>
         <CreateColumn tableId={props.tableId} colCount={props.columns.length}/>
     </div>
-    
-{/*     <pre>{JSON.stringify(data, null, "\t")}</pre> */}
     </div>
   );
 }

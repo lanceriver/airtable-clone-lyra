@@ -46,9 +46,11 @@ const columnHelper = createColumnHelper<ColumnData>();
 
 
 
-export default function BasePage(props: { params: Promise<Params> }) {   
+export default function BasePage(props: { params: Promise<Params> }) {  
+    const utils = api.useUtils(); 
     const params = use(props.params);
     const seed = params.seed;
+    const [sort, setSort] = useState<{ columnId: string; order: "asc" | "desc" } | null>(null);
     const data = useMemo(() => {
         return generateFakeData(5, seed);
     }, []);
@@ -62,7 +64,19 @@ export default function BasePage(props: { params: Promise<Params> }) {
                 return column.id;
             });
     console.log("mAP IS: ", columnMap);
-    const { data: rows, isLoading: isRowsLoading } = api.row.getRows.useQuery({ tableId, count: 100, offset: 0});
+    const { data: sortedRows, isLoading: isSortedRowsLoading } =
+  sort
+    ? api.row.sortRows.useQuery({ columnId: sort.columnId, order: sort.order })
+    : { data: null, isLoading: false };
+
+const { data: rows, isLoading: isRowsLoading } =
+  !sort
+    ? api.row.getRows.useQuery({ tableId, count: 100, offset: 0 })
+    : { data: null, isLoading: false };
+
+// Choose which data to use
+const tableRows = sort ? sortedRows : rows;
+const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
     console.log("Rows are: ", rows);
     if (isColumnsLoading || isRowsLoading) {
         return <div>Loading...</div>;
@@ -96,8 +110,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
     }
     console.log("The table columns are: ", tableColumns);
     return (
-        <div>
-            <Table data={data} rows={rows ?? []} columns={tableColumns ?? []} tableId={tableId}/>
+        <div className="flex flex-col h-screen overflow-y-auto">
+
+                <Table data={data} rows={rows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort}/>
         </div>
     )
 }

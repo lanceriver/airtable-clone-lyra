@@ -35,7 +35,7 @@ export default async function Home() {
     <HydrateClient>
       <main className="text-black">
         {session && 
-        <div>
+        <div className="h-screen overflow-hidden">
           <Navbar userName={session.user?.name ?? ""} userImage={session.user?.image ?? ""}/>
           <div className="bg-gray-50 min-h-screen">
             <HomeDashboard initialBases={bases}/>
