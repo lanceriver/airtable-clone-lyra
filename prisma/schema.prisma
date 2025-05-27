@@ -74,7 +74,7 @@ model Table {
     updatedAt DateTime @updatedAt
     columns   Column[]
     rows      Row[]
-    views     View[]
+    //views     View[]
     colCount  Int
     rowCount  Int
     seed      Int?
@@ -82,20 +82,20 @@ model Table {
     @@unique([baseId, name])
 }
 
-model View {
+/* model View {
     id        String   @id @default(cuid())
     name      String
     tableId   String
     table    Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+    filters   String? 
+    sort      String? 
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
-    columns   Column[]
-    rows      Row[]
     colCount  Int
     rowCount  Int
 
     @@unique([tableId, name])
-}
+} */
 
 model Column {
     position   Int      
