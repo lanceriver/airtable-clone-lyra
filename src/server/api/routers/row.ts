@@ -254,6 +254,9 @@ export const rowRouter = createTRPCRouter({
                 if (!cells) {
                     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create batch of cellsS!"})
                 }
+            }, {
+                maxWait: 10000,
+                timeout: 20000,
             });
         }
         return { success: true, message: "100k rows created successfully!" };
