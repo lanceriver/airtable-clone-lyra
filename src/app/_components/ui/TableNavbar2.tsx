@@ -48,19 +48,19 @@ export default function TableNavbar2({ baseId, initialTables, tableCount, childr
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
-  const colorOptions = [
-        "bg-blue-700/90",
-        "bg-red-700/90",
-        "bg-green-700/90",
-        "bg-white-700/90",
-        "bg-orange-700/90",
-        "bg-yellow-700/90",
-        "bg-purple-700/90"
-    ];      
+  const darkerColorMap: Record<string, string> = {
+  "bg-blue-700": "bg-blue-900/90",
+  "bg-red-700": "bg-red-900/90",
+  "bg-green-700": "bg-green-900/90",
+  "bg-orange-700": "bg-orange-900/90",
+  "bg-amber-700": "bg-amber-900/90",
+  "bg-purple-700": "bg-purple-900/90",
+};
+const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-900/90") : "bg-gray-900/90";
   return (
     <div className="flex flex-col h-screen">
       {/* Top navigation */}
-      <div className="flex items-center bg-blue-700/90  text-black font-normal py-0">
+      <div className={`flex items-center ${tableNavbarColor}  text-black font-normal py-0`}>
         {tables?.map((table) => (             
                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""}/>
           ))}

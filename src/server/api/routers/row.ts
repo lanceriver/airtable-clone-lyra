@@ -185,13 +185,16 @@ export const rowRouter = createTRPCRouter({
             },
             include: {
                 cells: true
-            }
+            },
         })
         if (!rows) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
         }
         const rowMap = new Map(rows.map(row => [row.id, row]));
-        const sortedRows = rowIds.map(id => rowMap.get(id)).filter(Boolean);
+        const sortedRows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);
+        if (!sortedRows) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to sort rows!"});
+        }
         return sortedRows;
     })
 })

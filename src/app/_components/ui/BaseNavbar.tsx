@@ -4,8 +4,9 @@ import { Button } from "~/components/ui/button";
 import Link from "next/link";
 import Image from "next/image";
 import { ArrowLeft } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { ColorPicker } from "~/app/_components/ui/ColorPicker";
+import { useSession } from "next-auth/react";
 
 type BaseNavbarProps = {
     baseName: string;
@@ -22,14 +23,19 @@ export function BaseNavbar({ baseName, baseId, children }: BaseNavbarProps) {
         "bg-amber-700",
         "bg-purple-700"
     ];
-    const [navbarColor, setNavbarColor] = useState("bg-purple-400");
+    const [navbarColor, setNavbarColor] = useState("bg-orange-700");
+    const didInit = useRef(false);
 
     // Read from localStorage after mount (client only)
     useEffect(() => {
-        const stored = localStorage.getItem(`navbarColor-${baseId}`);
-        if (stored && colorOptions.includes(stored)) {
-            setNavbarColor(stored);
+        if (!didInit.current) {
+            const stored = localStorage.getItem(`navbarColor-${baseId}`);
+            if (stored && colorOptions.includes(stored)) {
+                setNavbarColor(stored);
+            }
+            didInit.current = true;
         }
+        
     }, [baseId]);
 
 
@@ -74,7 +80,7 @@ export function BaseNavbar({ baseName, baseId, children }: BaseNavbarProps) {
             <div className="flex flex-row items-center gap-x-3">
                 <Button variant="ghost" className="text-xs rounded-md bg-inherit  text-white">Share</Button>
                 <Button variant="ghost" className="text-xs rounded-md bg-inherit  text-white">Settings</Button>
-                <UserDropdown userName="John Doe" userImage="/assets/user_image.png" />
+                <UserDropdown userName={"John Doe"} userImage="/assets/user_image.png" />
             </div>
             </div>
             {children}

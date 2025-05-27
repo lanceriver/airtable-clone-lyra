@@ -54,7 +54,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const data = useMemo(() => {
         return generateFakeData(5, seed);
     }, []);
-    console.log(data);
+    const handleSort = (columnId: string, order: "asc" | "desc") => {
+        setSort({ columnId, order});
+    }
     const { tableId } = params;
     const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId});
     console.log("Columns are: ", columns);
@@ -68,7 +70,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
   sort
     ? api.row.sortRows.useQuery({ columnId: sort.columnId, order: sort.order })
     : { data: null, isLoading: false };
-
+  console.log("Sorted rows are: ", sortedRows);
 const { data: rows, isLoading: isRowsLoading } =
   !sort
     ? api.row.getRows.useQuery({ tableId, count: 100, offset: 0 })
@@ -101,7 +103,6 @@ const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
             }
             return "";
         },
-        type: column.type,
         cell: TableCell,
         header: () => <span>{columnMap.get(column.id)}</span>,
     })));
@@ -110,9 +111,8 @@ const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
     }
     console.log("The table columns are: ", tableColumns);
     return (
-        <div className="flex flex-col h-screen overflow-y-auto">
-
-                <Table data={data} rows={rows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort}/>
+        <div className="flex flex-col h-screen overflow-y-auto relative">
+                <Table data={data} rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort}/>
         </div>
     )
 }

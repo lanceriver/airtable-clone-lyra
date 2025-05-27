@@ -102,13 +102,14 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
     )
 };
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string, sort: { columnId: string; order: "asc" | "desc" } | null }) {
+export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string, sort: { columnId: string; order: "asc" | "desc" } | null, handleSort: (columnId: string, order: "asc" | "desc") => void }) {
   const [ data, setData] = useState(() => [...props.rows]);
   const [dropdownCell, setDropdownCell] = useState<{
     cellId: string;
     rowId: string;
     columnId: string;
   } | null>(null);
+  const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const utils = api.useUtils();
   const table = useReactTable({
     data: props.rows,
@@ -184,10 +185,13 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
   
   const { rows } = table.getRowModel();
   console.log("columns length: ", props.columns.length);
+  function handleSort(columnId: string, order: "asc" | "desc"): void {
+    props.handleSort(columnId, order);
+  }
   return (
-    <div className="flex flex-row w-full overflow-y-hidden">
+    <div className="flex flex-row w-full overflow-auto position-relative">
       <table className="min-w-max border">
-      <thead className="sticky top-0">
+      <thead className="sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map(header => (
@@ -210,10 +214,14 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
                 </th>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onClick={() => setSort({columnId: header.column.id, order: "asc"})}>
+                    <ContextMenuItem onClick={() => handleSort(header.column.id, "asc")}>
                       Sort A-Z
                     </ContextMenuItem>
-                    <ContextMenuItem onClick={() => setSort({columnId: header.column.id, order: "desc"})}>
+                    <ContextMenuItem onClick={() => {
+                        handleSort(header.column.id, "desc")
+                        setActiveFilterColumn(header.column.id)
+                      }
+                    }>
                       Sort Z-A
                     </ContextMenuItem>
                   </ContextMenuContent>
