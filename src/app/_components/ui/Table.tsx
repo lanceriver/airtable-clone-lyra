@@ -2,7 +2,6 @@ import {
   useReactTable,
   getCoreRowModel,
   flexRender,
-  createColumnHelper
 } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
 import { faker } from "@faker-js/faker";
@@ -26,8 +25,10 @@ export type DefaultTableData = {
 }
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
-import { set, util } from "zod";
-import { Rowdies } from "next/font/google";
+import { useVirtualizer } from "@tanstack/react-virtual";
+
+
+
 
 type TableCellProps = {
   getValue: () => string | number;
@@ -190,7 +191,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
     props.handleSort(columnId, order);
   }
   return (
-    <div className="flex flex-row w-full overflow-auto position-relative">
+    <div className="flex flex-row">
       <table className="min-w-max border">
       <thead className="sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (

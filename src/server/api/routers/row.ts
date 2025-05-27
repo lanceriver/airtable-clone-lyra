@@ -6,6 +6,8 @@ import {
   publicProcedure,
 } from "~/server/api/trpc";
 
+import { generateFakeData, type DefaultTableData } from "./table";
+
 export const rowRouter = createTRPCRouter({
     createRow: protectedProcedure
     .input(z.object({ position: z.number(), tableId: z.string().min(1), direction: z.string().optional()}))
@@ -191,7 +193,7 @@ export const rowRouter = createTRPCRouter({
         return sortedRows;
     }),
     create100krows: protectedProcedure
-    .input(z.object({ tableId: z.string().min(1)}))
+    .input(z.object({ tableId: z.string().min(1), seed: z.string().min(1).optional()}))
     .mutation(async ({ ctx, input}) => {
         const columns = await ctx.db.column.findMany({
             where: {
@@ -202,7 +204,8 @@ export const rowRouter = createTRPCRouter({
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get table!"})
         }
         const columnIds = columns.map(columns => columns.id);
-        const batchSize = 10000;
+        const columnNames = columns.map(columns => columns.name);
+        const batchSize = 5000;
         for (let i = 0; i < 100000; i += batchSize) {
             await ctx.db.$transaction(async (tx) => {
                 const created = await tx.row.createMany({
@@ -220,15 +223,33 @@ export const rowRouter = createTRPCRouter({
                     orderBy: { id: "desc" },
                     take: batchSize,
                 });
+                const fakeData: DefaultTableData[] = generateFakeData(
+                    batchSize,
+                    input.seed ? Number(input.seed) : 0
+                );
+                // seed with fake data
                 const cells = await tx.cell.createMany({
-                    data: newRows.flatMap((row) =>
-                        columnIds.map((columnId) => ({
-                            rowId: row.id,
-                            columnId: columnId,
-                            stringValue: null,
-                            numberValue: null
-                        }))
-                    )
+                    data: newRows.flatMap((row, index) => {
+                        const data = fakeData[index];
+                        return columnIds.map((columnId, colIndex) => {
+                            const key = columnNames[colIndex] as keyof DefaultTableData;
+                            const cellValue = data ? data[key] ?? "" : "";
+                            let stringValue: string | undefined;
+                            let numberValue: number | undefined;
+                            if (typeof cellValue === "string") {
+                                stringValue = cellValue;
+                            }
+                            else if (typeof cellValue === "number") {
+                                numberValue = cellValue;
+                            }
+                            return {
+                                rowId: row.id,
+                                columnId: columnId,
+                                stringValue: stringValue,
+                                numberValue: numberValue
+                            };
+                        });          
+                    }).flat()
                 });
                 if (!cells) {
                     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create batch of cellsS!"})

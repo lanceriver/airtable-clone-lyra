@@ -10,7 +10,7 @@ import { faker } from "@faker-js/faker";
 import { create } from "domain";
 
 
-type DefaultTableData = {
+export type DefaultTableData = {
     firstName: string;
     lastName: string;
     number: number;

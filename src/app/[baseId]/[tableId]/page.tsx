@@ -114,7 +114,7 @@ const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
     }
     console.log("The table columns are: ", tableColumns);
     return (
-        <div className="flex flex-col h-screen overflow-y-auto relative">
+        <div className="flex flex-col h-full overflow-y-auto">
                 <Table data={data} rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort}/>
         </div>
     )
