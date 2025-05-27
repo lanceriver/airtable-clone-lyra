@@ -24,7 +24,6 @@ type Params = {
 
 export type RowData = {
     id: string;
-    position: number;
     tableId: string;
     cells: {
         id: string;
@@ -51,12 +50,14 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const params = use(props.params);
     const seed = params.seed;
     const [sort, setSort] = useState<{ columnId: string; order: "asc" | "desc" } | null>(null);
+    const [filters, setFilters] = useState<{ columnId: string; columnName: string; value: string; condition: string } | null>(null);
     const data = useMemo(() => {
         return generateFakeData(5, seed);
     }, []);
     const handleSort = (columnId: string, order: "asc" | "desc") => {
         setSort({ columnId, order});
     }
+
     const { tableId } = params;
     const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId});
     console.log("Columns are: ", columns);
@@ -87,8 +88,10 @@ const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
     const tableColumns = [];
     const idColumn = {
             id: "id",
-            accessorFn: (row: RowData) => row.position,
-            header: () => <span></span>,
+            header: () => <span>#</span>,
+            cell: (info: CellContext<RowData, unknown>) => {
+            return info.row.index + 1;
+  },
         };
     tableColumns.push(idColumn);
     const returnedColumns = columns?.map((column => ({

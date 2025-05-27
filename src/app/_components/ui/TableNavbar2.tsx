@@ -30,6 +30,7 @@ import { api } from "~/trpc/react"
 import { TableDropdown } from "./TableDropdown"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "~/components/ui/dialog";
 import { CreateTableForm } from "./CreateTable"
+import { set } from "zod"
 
 type Table = {
     baseId: string;
@@ -44,10 +45,28 @@ type Table = {
 
 export default function TableNavbar2({ baseId, initialTables, tableCount, children, navbarColor }: { baseId: string, initialTables: Table[], tableCount: number, children: React.ReactNode, navbarColor?: string }) {
   const [selectedTab, setSelectedTab] = useState(initialTables[0]?.name ?? "Table 1");
+  const [selectedTableId, setSelectedTableId] = useState(initialTables[0]?.id ?? "");
+  const handleSelectTab = (tableName: string, tableId: string) => {
+    setSelectedTab(tableName);
+    setSelectedTableId(tableId);
+  }
   const [createExpanded, setCreateExpanded] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
+  const { mutate: create100krows } = api.row.create100krows.useMutation({
+    onSuccess: () => {
+      console.log("100k rows created successfully");
+    },
+    onError: (error) => {
+      console.error("Error creating 100k rows:", error);
+    },
+  });
+  const handleCreateColumn = (tableId: string) => {
+    create100krows({ tableId });
+  }
+  
+ 
   const darkerColorMap: Record<string, string> = {
   "bg-blue-700": "bg-blue-900/90",
   "bg-red-700": "bg-red-900/90",
@@ -62,7 +81,7 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
       {/* Top navigation */}
       <div className={`flex items-center ${tableNavbarColor}  text-black font-normal py-0`}>
         {tables?.map((table) => (             
-                <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} setSelectedTab={setSelectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""}/>
+                <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""} handleSelectTab={handleSelectTab}/>
           ))}
 
         <Button variant="ghost" size="icon" className="h-10 w-10 rounded-none text-white hover:bg-blue-700">
@@ -239,10 +258,22 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
           <Sliders className="h-4 w-4" />
         </Button>
 
-        <Button variant="ghost" size="sm" className="h-8 gap-1">
+        <Button variant="ghost" size="sm" className="h-8  gap-1">
           <Share2 className="h-4 w-4" />
           <span>Share and sync</span>
         </Button>
+
+        <Button
+          variant="ghost"
+          size="sm"
+  className="h-8 gap-1"
+  onClick={() => {
+    // TODO: Implement your add 100k rows logic here
+    create100krows({ tableId: selectedTableId});
+  }}
+>
+  Add 100k rows
+</Button>
 
         <div className="ml-auto">
           <Button variant="ghost" size="icon" className="h-8 w-8">

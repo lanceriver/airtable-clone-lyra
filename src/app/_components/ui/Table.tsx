@@ -26,7 +26,7 @@ export type DefaultTableData = {
 }
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
-import { set } from "zod";
+import { set, util } from "zod";
 import { Rowdies } from "next/font/google";
 
 type TableCellProps = {
@@ -161,6 +161,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
   const { mutate: createRow } = api.row.createRow.useMutation({
     onSuccess: () => {
       void utils.row.getRows.invalidate();
+      void utils.row.sortRows.invalidate();
       console.log("Row created");
     },
     onError: (error) => {

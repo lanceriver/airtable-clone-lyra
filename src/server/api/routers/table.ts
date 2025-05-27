@@ -80,7 +80,6 @@ export const tableRouter = createTRPCRouter({
             for (let i = 0; i < table.rowCount; i++) {
                 const row = await ctx.db.row.create({
                     data: {
-                        position: i,
                         tableId: table.id
                     }
                 })
@@ -119,7 +118,6 @@ export const tableRouter = createTRPCRouter({
             // Create an additional empty row
             const extraRow = await ctx.db.row.create({
             data: {
-                position: table.rowCount, // one after the last index
                 tableId: table.id,
             }
             });

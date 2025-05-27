@@ -22,12 +22,12 @@ type TableDropdownProps = {
     tableId: string;
     tableName: string;
     selectedTab: string;
-    setSelectedTab: (tab: string) => void;
     tableCount: number;
     firstTableId: string;
+    handleSelectTab?: (tableName: string, tableId: string) => void;
 }
 
-export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSelectedTab, tableCount, firstTableId }: TableDropdownProps) {
+export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCount, firstTableId, handleSelectTab }: TableDropdownProps) {
     const router = useRouter();
     const utils = api.useUtils();
     console.log(tableCount);
@@ -52,7 +52,10 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, setSele
                     "px-4 py-2 h-10 hover:text-white rounded-none",  
                     selectedTab === tableName ? "bg-white text-black" : "text-white hover:bg-black",
                 )}
-                    onClick={() => setSelectedTab(tableName)}
+                    onClick={() => {
+                        handleSelectTab?.(tableName, tableId);
+                    }
+                    }
                 >
                     {tableName}
                 </Button>
