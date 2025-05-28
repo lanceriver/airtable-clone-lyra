@@ -6,7 +6,7 @@ import {
 import type { ColumnDef } from "@tanstack/react-table";
 import { faker } from "@faker-js/faker";
 import type { RowData } from "~/app/[baseId]/[tableId]/page";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api } from "~/trpc/react";
 import { CreateColumn } from "./CreateColumn";
 import { Plus } from "lucide-react";
@@ -26,9 +26,19 @@ export type DefaultTableData = {
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { sseHeaders } from "@trpc/server/unstable-core-do-not-import";
 
 
-
+type TableProps = {
+  rows: RowData[];
+  columns: ColumnDef<RowData, any>[];
+  tableId: string;
+  sort: { columnId: string; order: "asc" | "desc" } | null;
+  handleSort: (columnId: string, order: "asc" | "desc") => void;
+  fetchNextPage?: () => void;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+};
 
 type TableCellProps = {
   getValue: () => string | number;
@@ -82,7 +92,6 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
         e.preventDefault();
         if (value !== initialValue) {
             if (typeof value === "string") {
-                console.log("rowId: :", row.id, "columnId: ", column.id, "value: ", value);
                 updateCell({ rowId: row.id, columnId: column.id, stringValue: value });
             }
             else if (typeof value === "number") {
@@ -90,7 +99,6 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
             }
         }
     }
-    console.log(value);
     return (
         <form className="w-full border-none bg-transparent focus:outline-none" onSubmit={handleSubmit}>
             <input
@@ -102,9 +110,12 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
         </form>
     )
 };
+
+
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table(props: { data: DefaultTableData[], rows: RowData[], columns: ColumnDef<RowData, any>[], tableId: string, sort: { columnId: string; order: "asc" | "desc" } | null, handleSort: (columnId: string, order: "asc" | "desc") => void }) {
-  const [ data, setData] = useState(() => [...props.rows]);
+export function Table({rows: propRows, columns, tableId, sort, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage}: TableProps) {
+  const [ data, setData] = useState(() => [...propRows]);
+  const [ page, setPage] = useState(0);
   const [dropdownCell, setDropdownCell] = useState<{
     cellId: string;
     rowId: string;
@@ -112,13 +123,20 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
   } | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const utils = api.useUtils();
+
+
+  
+
   const table = useReactTable({
-    data: props.rows,
-    columns: props.columns,
+    data: propRows,
+    columns: columns,
     columnResizeMode: "onChange",
     getRowId: originalRow => originalRow.id,
     getCoreRowModel: getCoreRowModel(),
-    rowCount: props.rows.length,
+    rowCount: propRows.length,
+    defaultColumn: {
+      size:200
+    },
     meta: {
       updateData: (rowIndex: number, columnId: string, value: unknown) => {
         setData((old) =>
@@ -135,6 +153,9 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
       }
     }
   });
+
+  const { rows } = table.getRowModel();
+
   const { mutate: createNewColumn } = api.column.createNewColumn.useMutation({
         onSuccess: () => {
           void utils.column.getColumns.invalidate();
@@ -144,6 +165,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
             console.error("Error creating column:", error);
         }
     })
+
   const handleCreateColumn = (tableId: string, position: number, name: string, type: string, operation: string) => {
     createNewColumn({
         tableId: tableId,
@@ -152,13 +174,15 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
         type: type
     });
   }
+
   const handleCreateRow = (direction?: string, position?: number) => {
-    let fnPosition = props.rows.length;
+    let fnPosition = rows.length;
     if (position) {
       fnPosition = position;
     }
-    createRow({ tableId: props.tableId, position: fnPosition, direction: direction});
+    createRow({ tableId: tableId, position: fnPosition, direction: direction});
   }
+
   const { mutate: createRow } = api.row.createRow.useMutation({
     onSuccess: () => {
       void utils.row.getRows.invalidate();
@@ -169,6 +193,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
       console.error("Error creating row:", error);
     }
   })
+
   const { mutate: deleteRow } = api.row.deleteRow.useMutation({
     onSuccess: () => {
       void utils.row.getRows.invalidate();
@@ -178,6 +203,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
       console.error("Error deleting row", error);
     }
   })
+
   const handleDeleteRow = (tableId: string, rowId: string) => {
     deleteRow({
       tableId: tableId,
@@ -185,22 +211,44 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
     })
   };
   
-  const { rows } = table.getRowModel();
-  console.log("columns length: ", props.columns.length);
-  function handleSort(columnId: string, order: "asc" | "desc"): void {
-    props.handleSort(columnId, order);
+  const tableRef = useRef<HTMLDivElement>(null);
+
+  const rowVirtualizer = useVirtualizer({
+      count: hasNextPage ? rows.length + 1 : rows.length,
+      estimateSize: () => 10,
+      getScrollElement: () => tableRef.current,
+      overscan: 20,
+  });
+  const virtualItems = rowVirtualizer.getVirtualItems();
+  
+  useEffect(() => {
+    const [lastItem] = [...virtualItems].reverse();
+    
+    if (!lastItem) {
+      return;
+    }
+    if (lastItem.index >= rows.length - 30 && hasNextPage && !isFetchingNextPage) {
+      fetchNextPage?.(); 
+    }
+  }, [fetchNextPage, rows.length, hasNextPage, virtualItems]);
+
+  console.log("columns length: ", columns.length);
+  function handleSortClick(columnId: string, order: "asc" | "desc"): void {
+    handleSort(columnId, order);
   }
   return (
-    <div className="flex flex-row">
-      <table className="min-w-max border">
-      <thead className="sticky top-0 z-10">
+    <div className="flex flex-row overflow-auto relative" style={{height: 700}} ref={tableRef} >
+      <table className="table-fixed min-w-max grid">
+      <thead className="grid sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
-          <tr key={headerGroup.id}>
+          <tr key={headerGroup.id} className="flex w-full">
             {headerGroup.headers.map(header => (
               <React.Fragment key={header.id}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
-                    <th className="border px-2 bg-gray-100 min-w-2 max-w-4 sticky top-0 z-10">
+                  <th className={`border px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`}
+                  style={header.column.id !== 'id' ? {width: `${header.column.getSize()}px`, minWidth: `${header.column.getSize()}px`, maxWidth: `${header.column.getSize()}px`} : {}}
+                  >
                 {header.isPlaceholder ? null : (
                 <div className="flex justify-between items-center gap-2 text-xs font-normal py-2">
                 {flexRender(header.column.columnDef.header, header.getContext())}
@@ -208,7 +256,7 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
                   <ColumnDropdown
                   columnId={header.column.id}
                   columnName={header.column.columnDef.header as string}
-                  tableId={props.tableId}
+                  tableId={tableId}
                   />
                 )}   
                 </div>
@@ -216,11 +264,11 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
                 </th>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
-                    <ContextMenuItem onClick={() => handleSort(header.column.id, "asc")}>
+                    <ContextMenuItem onClick={() => handleSortClick(header.column.id, "asc")}>
                       Sort A-Z
                     </ContextMenuItem>
                     <ContextMenuItem onClick={() => {
-                        handleSort(header.column.id, "desc")
+                        handleSortClick(header.column.id, "desc")
                         setActiveFilterColumn(header.column.id)
                       }
                     }>
@@ -236,48 +284,62 @@ export function Table(props: { data: DefaultTableData[], rows: RowData[], column
           </tr>
         ))}
       </thead>
-      <tbody>
+      <tbody style={{display: 'grid', height: `${rowVirtualizer.getTotalSize()}px`, position: "relative"}} >
         {table.getRowModel().rows.length === 0 ? (
           <tr>
-            <td colSpan={props.columns.length} className="text-center py-4 text-gray-400">
+            <td colSpan={columns.length} className="text-center py-4 text-gray-400">
               No data
             </td>
           </tr>
         ) : (
-          table.getRowModel().rows.map((row, idx, arr) => (
-            <tr key={row.id}>
-              {row.getVisibleCells().map((cell, colIdx) => (
-              <ContextMenu key={cell.id}>
-                <ContextMenuTrigger asChild>
-                  <td key={cell.id} className="border px-2 py-1 text-xs">
+          rowVirtualizer.getVirtualItems().map(virtualRow => {
+            const row = rows[virtualRow.index];
+            if (!row) return null;
+            const idx = virtualRow.index;
+            const arr = rows;
+            return (
+              <tr 
+                data-index={virtualRow.index} // dynamic row measurement
+                ref={node => { if (node) {
+                    rowVirtualizer.measureElement(node)} // measure dynamic row height
+                }}
+                key={row.id}
+                style={{
+                  display: 'flex',
+                  transform: `translateY(${virtualRow.start}px)`,
+                  top: 0,
+                  left: 0,
+                  position: 'absolute',
+                  width: "100%"
+                }}
+              >
+                {row.getVisibleCells().map((cell, colIdx) => (
+                  <ContextMenu key={cell.id}>
+                    <ContextMenuTrigger asChild>
+                      <td key={cell.id} className={`border flex px-2 py-1 text-xs ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`} style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 
                             ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>
                             : flexRender(cell.column.columnDef.cell, cell.getContext()))
                           : flexRender(cell.column.columnDef.cell, cell.getContext())
                         }
-                  </td>
-                </ContextMenuTrigger>
+                      </td>
+                    </ContextMenuTrigger>
                     <ContextMenuContent>
-                <ContextMenuItem /* onClick={() => handleCreateRow("up", idx + 1)} */>
-                  Insert row above
-                </ContextMenuItem>
-                <ContextMenuItem /* onClick={() => handleCreateRow("down", idx + 1)} */>
-                  Insert row below
-                </ContextMenuItem>
-                <ContextMenuItem onClick={() => handleDeleteRow(props.tableId, row.id)}>
-                  Delete row
-                </ContextMenuItem>
-              </ContextMenuContent>
-              </ContextMenu>
-              ))}
-            </tr>
-          ))
+                      <ContextMenuItem onClick={() => handleDeleteRow(tableId, row.id)}>
+                        Delete row
+                      </ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                ))}
+              </tr>
+            );
+          })
         )}
       </tbody>
     </table>
     <div>
-        <CreateColumn tableId={props.tableId} colCount={props.columns.length}/>
+        <CreateColumn tableId={tableId} colCount={columns.length}/>
     </div>
     </div>
   );

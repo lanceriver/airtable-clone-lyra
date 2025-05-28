@@ -60,34 +60,47 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const { tableId } = params;
     const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId});
-    console.log("Columns are: ", columns);
     const columnMap = new Map<string, string>();
     const final = columns?.map((column) => {
             columnMap.set(column.id, column.name);
                 return column.id;
             });
-    console.log("mAP IS: ", columnMap);
+
     const { data: sortedRows, isLoading: isSortedRowsLoading } =
-  sort
-    ? api.row.sortRows.useQuery({ columnId: sort.columnId, order: sort.order })
-    : { data: null, isLoading: false };
-  console.log("Sorted rows are: ", sortedRows);
-const { data: rows, isLoading: isRowsLoading } =
-  !sort
-    ? api.row.getRows.useQuery({ tableId, count: 100, offset: 0 })
-    : { data: null, isLoading: false };
+        sort ? api.row.sortRows.useQuery({ columnId: sort.columnId, order: sort.order })
+                : { data: null, isLoading: false };
+
+    const { data: nextRows, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = 
+    
+    !sort ? api.row.getRows.useInfiniteQuery(
+        {
+          tableId: tableId,
+          count: 100,
+          offset: 0,
+        },
+        {
+          initialCursor: null,
+          getNextPageParam: (lastPage) => lastPage.nextCursor,
+        }
+      ) : {data: null, isLoading: false};
+    const flattened = useMemo(
+        () => nextRows?.pages?.flatMap((page) => page.rows) ?? [],
+        [nextRows]
+    );
 
 // Choose which data to use
-const tableRows = sort ? sortedRows : rows;
-const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
-    console.log("Rows are: ", rows);
-    if (isColumnsLoading || isRowsLoading) {
+const tableRows = sort ? sortedRows : flattened;
+const loading = isColumnsLoading || isLoading || isSortedRowsLoading;
+    if (isColumnsLoading || isLoading) {
         return <div>Loading...</div>;
     }
     const rowMap = new Map<string, string>();
     const tableColumns = [];
     const idColumn = {
             id: "id",
+            size: 80,
+            minSize:80,
+            maxSize:80,
             header: () => <span>#</span>,
             cell: (info: CellContext<RowData, unknown>) => {
             return info.row.index + 1;
@@ -108,14 +121,14 @@ const loading = isColumnsLoading || isRowsLoading || isSortedRowsLoading;
         },
         cell: TableCell,
         header: () => <span>{columnMap.get(column.id)}</span>,
+        size: 200,
     })));
     if (returnedColumns) {
         tableColumns.push(...returnedColumns);
     }
-    console.log("The table columns are: ", tableColumns);
     return (
-        <div className="flex flex-col h-full overflow-y-auto">
-                <Table data={data} rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort}/>
+        <div className="flex flex-col">
+                <Table rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort} fetchNextPage={fetchNextPage} isFetchingNextPage={isFetchingNextPage} hasNextPage={hasNextPage}/>
         </div>
     )
 }

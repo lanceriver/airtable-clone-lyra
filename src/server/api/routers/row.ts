@@ -105,21 +105,34 @@ export const rowRouter = createTRPCRouter({
     }),
     // Construct table data from rows and columns to send to the client, makes it easier to render the table.
     getRows: protectedProcedure
-    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(100), offset: z.number().min(0)}))
+    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.string().nullish(), direction: z.enum(['forward', 'backward']).optional()}))
     .query(async ({ ctx, input}) => {
+        const { cursor } = input;
         const rows = await ctx.db.row.findMany({
+            take: input.count + 1,
             where: {
                 tableId: input.tableId
             },
             include: {
-                cells: true },
-            take: input.count + 1,
-            skip: input.offset,
-        })
+                cells: true 
+            },
+            cursor: cursor ? {id: cursor} : undefined,
+            orderBy: {
+                id: 'asc',
+            },
+        });
         if (!rows) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
         }
-        return rows;
+        let nextCursor: typeof cursor | undefined = undefined;
+        if (rows.length > input.count) {
+            const nextItem = rows.pop();
+            nextCursor = nextItem?.id;
+        }
+        return {
+            rows,
+            nextCursor
+        };
     }),
     deleteRow: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), rowId: z.string().min(1)}))
