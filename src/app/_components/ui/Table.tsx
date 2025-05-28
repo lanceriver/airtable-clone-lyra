@@ -31,6 +31,7 @@ import { sseHeaders } from "@trpc/server/unstable-core-do-not-import";
 
 type TableProps = {
   rows: RowData[];
+  // eslint-disable-next-line  @typescript-eslint/no-explicit-any
   columns: ColumnDef<RowData, any>[];
   tableId: string;
   sort: { columnId: string; order: "asc" | "desc" } | null;
