@@ -23,7 +23,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${geist.variable}`}>
       <body className="h-screen overflow-hidden">
-        <TRPCReactProvider>{children}<Toaster /></TRPCReactProvider>
+        <TRPCReactProvider>{children}<Toaster richColors closeButton/></TRPCReactProvider>
         
       </body>
     </html>

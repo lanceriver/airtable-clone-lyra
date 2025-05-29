@@ -30,8 +30,21 @@ import { api } from "~/trpc/react"
 import { TableDropdown } from "./TableDropdown"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "~/components/ui/dialog";
 import { CreateTableForm } from "./CreateTable"
-import { set } from "zod"
-import { Toaster } from "~/components/ui/sonner"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover"
+import { Label } from "~/components/ui/label"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select"
 import { toast } from "sonner"
 
 type Table = {
@@ -46,32 +59,51 @@ type Table = {
 };
 
 export default function TableNavbar2({ baseId, initialTables, tableCount, children, navbarColor }: { baseId: string, initialTables: Table[], tableCount: number, children: React.ReactNode, navbarColor?: string }) {
-  const [selectedTab, setSelectedTab] = useState(initialTables[0]?.name ?? "Table 1");
+  const [selectedTab, setSelectedTab] = useState(() => {
+    return localStorage.getItem("selectedTab") ?? (initialTables[0]?.name ?? "Table 1");
+  })
+
+  useEffect(() => {
+    localStorage.setItem("selectedTab", selectedTab);
+  }, [selectedTab]);
   const [selectedTableId, setSelectedTableId] = useState(initialTables[0]?.id ?? "");
+
   const handleSelectTab = (tableName: string, tableId: string) => {
     setSelectedTab(tableName);
     setSelectedTableId(tableId);
   }
   const utils = api.useUtils();
   const [createExpanded, setCreateExpanded] = useState(true);
+
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+
+  const handleFilter = () => {
+    setFilterDialogOpen(true);
+    console.log("todo");
+  }
+
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
   const { mutate: create100krows, isPending: is100KPending } = api.row.create100krows.useMutation({
     onSuccess: () => {
-      toast("100k rows created successfully!");
+      toast.success("100k rows created successfully!");
       void utils.row.getRows.invalidate();
     },
     onError: (error) => {
-      console.error("Error creating 100k rows:", error);
+      toast.error("Error creating rows. Please try again later.")
     },
   });
+
+  const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId: selectedTableId });
+  const columnNames = columns ? columns.map((col) => col?.name) : [];
+  console.log(columnNames);
 
   const toastIdRef = useRef<string | number | null>(null);
 
   useEffect(() => {
       if (is100KPending) {
-          toastIdRef.current = toast("100k rows are currently being added. Please be patient!");
+          toastIdRef.current = toast("100k rows are currently being added. Please be patient!", {duration: Infinity});
       }
       if (!is100KPending) {
         toast.dismiss(toastIdRef.current ?? undefined);
@@ -92,6 +124,10 @@ export default function TableNavbar2({ baseId, initialTables, tableCount, childr
   "bg-amber-700": "bg-amber-900/90",
   "bg-purple-700": "bg-purple-900/90",
 };
+
+  const operators: string[] = ["contains", "does not contain", "is", "is not", "is empty", "is not empty"];
+
+
 const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-900/90") : "bg-gray-900/90";
   return (
     <div className="flex flex-col h-screen">
@@ -124,7 +160,7 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
                                     <DialogTitle>Create new table</DialogTitle>
                                     <DialogDescription>Build your table from scratch.</DialogDescription>
                                 </DialogHeader>
-                                <CreateTableForm baseId={baseId} onSuccess={() => setDialogOpen(false)} 
+                                <CreateTableForm baseId={baseId} onSuccess={() => setDialogOpen(false)} handleSelectTab={handleSelectTab} 
                                     />
                                     <DialogFooter className="flex justify-between w-full">
                                     <div>
@@ -139,7 +175,7 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
                                     </div>   
                                 </DialogFooter>
                             </DialogContent>
-                        </Dialog>
+                          </Dialog>
         <div className="ml-auto flex items-center">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -219,18 +255,51 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
           <span>Hide fields</span>
         </Button>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
-              <Filter className="h-4 w-4" />
-              <span>Filter</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Add filter</DropdownMenuItem>
-            <DropdownMenuItem>Clear filters</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <Popover>
+          <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 gap-1">
+                <Filter className="h-4 w-4" />
+                <span>Filter</span>
+              </Button>
+          </PopoverTrigger>
+          <PopoverContent className="grid grid-cols-1 gap-y-5 w-full max-w-[500px]">
+            <Label htmlFor="name" className="text-right">
+              In this view, show records
+            </Label>
+            <div className="flex flex-row gap-2 items-center">
+              <Label htmlFor="column">Where</Label>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a column"/>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Columns</SelectLabel>
+                    {columnNames.map(column => (
+                      <SelectItem key={column} value={column}>{column}</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Select>
+                <SelectTrigger>
+                  <SelectValue placeholder="contains"/>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Operators</SelectLabel>
+                    {operators.map(operator => (
+                      <SelectItem key={operator} value={operator}>{operator}...</SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+              <Input placeholder="Value" className="text-sm" onSubmit={() => handleFilter()}/>
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -291,7 +360,6 @@ const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-
 >
   Add 100k rows
 </Button>
-
         <div className="ml-auto">
           <Button variant="ghost" size="icon" className="h-8 w-8">
             <Search className="h-4 w-4" />

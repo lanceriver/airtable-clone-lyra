@@ -18,6 +18,15 @@ import {
   DialogTrigger,
   DialogClose
 } from "~/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectLabel,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select"
 import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { Button } from "~/components/ui/button";
@@ -72,7 +81,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
         <>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-none bg-gray-400">
+                <Button variant="outline" className="rounded-none bg-gray-100">
                     <Plus className="mr-2 h-4 w-4 justify-center" />
                 </Button>
             </DropdownMenuTrigger>
@@ -93,17 +102,30 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                             </DialogDescription>
                             </DialogHeader>
                             <div className="grid gap-4 py-4">
-                            <div className="grid grid-cols-4 items-center gap-4">
+                            <div className="grid grid-cols-4 items-center gap-6">
                             <Label htmlFor="name" className="text-right">
                                 Column Name
                             </Label>
                             <Input id="name" placeholder="Column name" className="col-span-3" value={columnName} onChange={(e) => setColumnName(e.target.value)} />
+                            <Label htmlFor="type" className="text-right">
+                                Column Type
+                            </Label>
+                            <Select>
+                              <SelectTrigger className="col-span-3 w-full">
+                                <SelectValue placeholder="Select a column type"/>
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="string" onClick={() => setColumnType("string")}>Text</SelectItem>
+                                <SelectItem value="number" onClick={() => setColumnType("number")}>Number</SelectItem>
+                              </SelectContent>
+                            </Select>
                             </div>
+                            
                             <div className="grid grid-cols-4 items-center gap-4">
                             </div>
                             </div>
                             <DialogFooter>
-                                    <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, "string")}>Save changes</Button>
+                                    <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, columnType)}>Save changes</Button>
                             </DialogFooter>
                             </DialogContent>
                         </Dialog>

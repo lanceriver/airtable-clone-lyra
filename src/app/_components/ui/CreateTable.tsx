@@ -11,7 +11,7 @@ import { useEffect } from "react";
 const DEFAULT_COL_COUNT = 4;
 const DEFAULT_ROW_COUNT = 5;
 
-export function CreateTableForm({ baseId, onSuccess }: { baseId: string, onSuccess?: () => void }) {
+export function CreateTableForm({ baseId, onSuccess, handleSelectTab }: { baseId: string, onSuccess?: () => void, handleSelectTab: (tableName: string, tableId: string) => void }) {
     const router = useRouter();
     const [tableName, setTableName] = useState("");
     const [colCount, setColCount] = useState(DEFAULT_COL_COUNT);
@@ -35,6 +35,7 @@ export function CreateTableForm({ baseId, onSuccess }: { baseId: string, onSucce
         createTable({ baseId, name: tableName, colCount, rowCount, seed }, {
             onSuccess: (createdTable) => {
                 setTableName("");
+                handleSelectTab(tableName, createdTable.id);
                 router.push(`/${baseId}/${createdTable.id}?seed=${seed}`);
                 onSuccess?.();
             },
