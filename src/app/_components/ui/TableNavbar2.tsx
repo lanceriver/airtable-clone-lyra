@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   Calendar,
   ChevronDown,
@@ -31,6 +31,8 @@ import { TableDropdown } from "./TableDropdown"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "~/components/ui/dialog";
 import { CreateTableForm } from "./CreateTable"
 import { set } from "zod"
+import { Toaster } from "~/components/ui/sonner"
+import { toast } from "sonner"
 
 type Table = {
     baseId: string;
@@ -50,18 +52,33 @@ export default function TableNavbar2({ baseId, initialTables, tableCount, childr
     setSelectedTab(tableName);
     setSelectedTableId(tableId);
   }
+  const utils = api.useUtils();
   const [createExpanded, setCreateExpanded] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
-  const { mutate: create100krows } = api.row.create100krows.useMutation({
+  const { mutate: create100krows, isPending: is100KPending } = api.row.create100krows.useMutation({
     onSuccess: () => {
-      console.log("100k rows created successfully");
+      toast("100k rows created successfully!");
+      void utils.row.getRows.invalidate();
     },
     onError: (error) => {
       console.error("Error creating 100k rows:", error);
     },
   });
+
+  const toastIdRef = useRef<string | number | null>(null);
+
+  useEffect(() => {
+      if (is100KPending) {
+          toastIdRef.current = toast("100k rows are currently being added. Please be patient!");
+      }
+      if (!is100KPending) {
+        toast.dismiss(toastIdRef.current ?? undefined);
+        toastIdRef.current = null;
+      }
+  }, [is100KPending])
+
   const handleCreateColumn = (tableId: string) => {
     create100krows({ tableId });
   }

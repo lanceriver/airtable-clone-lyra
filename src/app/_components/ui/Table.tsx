@@ -236,13 +236,14 @@ export function Table({rows: propRows, columns, tableId, sort, handleSort, fetch
   console.log("columns length: ", columns.length);
   function handleSortClick(columnId: string, order: "asc" | "desc"): void {
     handleSort(columnId, order);
+    void utils.row.getRows.invalidate
   }
   return (
     <div className="flex flex-row overflow-auto relative" style={{height: 700}} ref={tableRef} >
-      <table className="table-fixed min-w-max grid">
+      <table className="table-fixed min-w-max">
       <thead className="grid sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
-          <tr key={headerGroup.id} className="flex w-full">
+          <tr key={headerGroup.id} className="sticky flex w-full">
             {headerGroup.headers.map(header => (
               <React.Fragment key={header.id}>
                 <ContextMenu>

@@ -25,12 +25,16 @@ type Params = {
 export type RowData = {
     id: string;
     tableId: string;
+    createdAt: Date;
+    updatedAt: Date;
     cells: {
         id: string;
+        createdAt: Date;
+        updatedAt: Date;
         columnId: string;
         rowId: string;
-        stringValue?: string | null;
-        numberValue?: number | null;
+        stringValue: string | null;
+        numberValue: number | null;
     }[];
 }
 
@@ -51,9 +55,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const seed = params.seed;
     const [sort, setSort] = useState<{ columnId: string; order: "asc" | "desc" } | null>(null);
     const [filters, setFilters] = useState<{ columnId: string; columnName: string; value: string; condition: string } | null>(null);
-    const data = useMemo(() => {
-        return generateFakeData(5, seed);
-    }, []);
+
     const handleSort = (columnId: string, order: "asc" | "desc") => {
         setSort({ columnId, order});
     }
@@ -66,9 +68,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
                 return column.id;
             });
 
-    const { data: sortedRows, isLoading: isSortedRowsLoading } =
+    /* const { data: sortedRows, isLoading: isSortedRowsLoading } =
         sort ? api.row.sortRows.useQuery({ columnId: sort.columnId, order: sort.order })
-                : { data: null, isLoading: false };
+                : { data: null, isLoading: false }; */
 
     const { data: nextRows, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = 
     
@@ -82,15 +84,29 @@ export default function BasePage(props: { params: Promise<Params> }) {
           initialCursor: null,
           getNextPageParam: (lastPage) => lastPage.nextCursor,
         }
-      ) : {data: null, isLoading: false};
+      ) : api.row.getRows.useInfiniteQuery(
+        {
+            tableId: tableId,
+            count: 100,
+            offset: 0,
+            sort: sort
+        },
+        {
+            initialCursor: null,
+            getNextPageParam: (lastPage) => lastPage.nextCursor
+        }
+      )
+    console.log("next rows are:", nextRows);
     const flattened = useMemo(
         () => nextRows?.pages?.flatMap((page) => page.rows) ?? [],
         [nextRows]
     );
+    console.log(sort);
+    console.log(flattened);
 
 // Choose which data to use
-const tableRows = sort ? sortedRows : flattened;
-const loading = isColumnsLoading || isLoading || isSortedRowsLoading;
+ const tableRows = flattened.filter((row): row is RowData => !!row);
+const loading = isColumnsLoading || isLoading;
     if (isColumnsLoading || isLoading) {
         return <div>Loading...</div>;
     }

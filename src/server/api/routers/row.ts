@@ -105,34 +105,82 @@ export const rowRouter = createTRPCRouter({
     }),
     // Construct table data from rows and columns to send to the client, makes it easier to render the table.
     getRows: protectedProcedure
-    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.string().nullish(), direction: z.enum(['forward', 'backward']).optional()}))
+    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.string().nullish(), direction: z.enum(['forward', 'backward']).optional(),
+            sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional()
+    }))
     .query(async ({ ctx, input}) => {
         const { cursor } = input;
-        const rows = await ctx.db.row.findMany({
-            take: input.count + 1,
-            where: {
-                tableId: input.tableId
-            },
-            include: {
-                cells: true 
-            },
-            cursor: cursor ? {id: cursor} : undefined,
-            orderBy: {
-                id: 'asc',
-            },
-        });
-        if (!rows) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+        console.log("Input is:", input.count);
+        if (input.sort) {
+            const cells = await ctx.db.cell.findMany({
+                take: input.count + 1,
+                where: {
+                    columnId: input.sort.columnId
+                },
+                orderBy: {
+                    ...(input.sort.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
+                },
+                cursor: cursor ? {id: cursor} : undefined
+            })
+            if (!cells) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get cells!"})
+            }
+
+            const rowIds = cells.map(cell => cell.rowId);
+            let rows = await ctx.db.row.findMany({
+                take: input.count + 1,
+                where: {
+                    id: { in: rowIds }
+                },
+                include: {
+                    cells: true
+                },
+            })
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+            }
+            //console.log("rows are:", rows);
+            const rowMap = new Map(rows.map(row => [row.id, row]));
+            rows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to sort rows!"});
+            }
+            let nextCursor: typeof cursor | undefined = undefined;
+            if (cells.length > input.count) {
+                const nextItem = cells.pop();
+                nextCursor = nextItem?.id;
+            }
+            return {
+                rows, nextCursor
+            };
         }
-        let nextCursor: typeof cursor | undefined = undefined;
-        if (rows.length > input.count) {
-            const nextItem = rows.pop();
-            nextCursor = nextItem?.id;
+        else {
+            const rows = await ctx.db.row.findMany({
+                take: input.count + 1,
+                where: {
+                    tableId: input.tableId
+                },
+                include: {
+                    cells: true 
+                },
+                cursor: cursor ? {id: cursor} : undefined,
+                orderBy: {
+                        id: 'asc',
+                    },
+            }) 
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+            }
+            let nextCursor: typeof cursor | undefined = undefined;
+            if (rows.length > input.count) {
+                const nextItem = rows.pop();
+                nextCursor = nextItem?.id;
+            }
+            return {
+                rows,
+                nextCursor
+            };
         }
-        return {
-            rows,
-            nextCursor
-        };
     }),
     deleteRow: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), rowId: z.string().min(1)}))
@@ -272,6 +320,16 @@ export const rowRouter = createTRPCRouter({
                 timeout: 20000,
             });
         }
+        await ctx.db.table.update({
+            where: {
+                id: input.tableId
+            },
+            data: {
+                rowCount: {
+                    increment: 100000
+                }
+            }
+        })
         return { success: true, message: "100k rows created successfully!" };
     }),
 })
