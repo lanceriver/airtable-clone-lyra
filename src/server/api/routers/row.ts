@@ -8,42 +8,49 @@ import {
 
 import { generateFakeData, type DefaultTableData } from "./table";
 
+import { Prisma } from '@prisma/client';
+import build from "next/dist/build";
+import { table } from "console";
+
+const operatorsMap = {
+  "contains": (columnId: string, value: string | number) => ({
+    "stringValue": { contains: String(value) }
+  }),
+  "does not contain": (columnId: string, value: string | number) => ({
+    NOT: { "stringValue": { contains: String(value) } }
+  }),
+  "is": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { equals: value }
+  }),
+  "is not": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { not: value }
+  }),
+  "empty": (columnId: string) => ({
+    "stringValue": null,
+    "numberValue": null
+  }),
+  "is not empty": (columnName: string) => ({
+    NOT: { "stringValue": null,
+        "numberValue": null
+     }
+  })
+};
+
+type Operator = keyof typeof operatorsMap;
+
+function buildQuery(columnId: string, value: string | number, operator: Operator) {
+    const queryFunction = operatorsMap[operator];
+    if (!queryFunction) {
+        throw new Error("Failed to parse operator!")
+    }
+    return queryFunction(columnId, value);
+}
+
+
 export const rowRouter = createTRPCRouter({
     createRow: protectedProcedure
     .input(z.object({ position: z.number(), tableId: z.string().min(1), direction: z.string().optional()}))
     .mutation(async ({ ctx, input }) => {
-        /* const existing = await ctx.db.row.findFirst({
-            where: {
-                tableId: input.tableId,
-                position: input.position
-            }
-        });
-        if (existing) {
-            throw new TRPCError({ code: "CONFLICT", message: "Cannot add row in the same position!"})
-        } */
-       // Insert a new row above or below.
-        /* if (input.direction === "above") {
-            await ctx.db.row.updateMany({
-                where: {
-                    tableId: input.tableId,
-                },
-                data: {
-                    position: { increment: 1 }
-                }
-        }); */
-        // Insert at input.position
-        /* } else if (input.direction === "below") {
-            await ctx.db.row.updateMany({
-                where: {
-                    tableId: input.tableId,
-                    position: { gt: input.position }
-                },
-                data: {
-                    position: { increment: 1 }
-                }
-            });
-            input.position = input.position + 1; 
-        } */
         const row = await ctx.db.row.create({
             data: {
                 tableId: input.tableId
@@ -103,29 +110,136 @@ export const rowRouter = createTRPCRouter({
         }
         return row;
     }),
-    // Construct table data from rows and columns to send to the client, makes it easier to render the table.
+    // Construct table data from rows and columns to send to the client, makes it easier to render the table. Also takes filter and sort if specified by frontend.
     getRows: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.string().nullish(), direction: z.enum(['forward', 'backward']).optional(),
-            sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional()
+            sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional(), 
+            filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
+                value: z.union([z.string().min(1), z.number()]).optional(),
+            }).optional()
     }))
     .query(async ({ ctx, input}) => {
-        const { cursor } = input;
-        console.log("Input is:", input.count);
-        if (input.sort) {
+        const { cursor, sort, filters, count, tableId } = input;
+        // Dynamically construct query based on args provided (sort / filter)
+
+        if (!filters && !sort) {
+            const rows = await ctx.db.row.findMany({
+                take: input.count + 1,
+                where: {
+                    tableId: input.tableId
+                },
+                include: {
+                    cells: true 
+                },
+                cursor: cursor ? {id: cursor} : undefined,
+                orderBy: {
+                        id: 'asc',
+                    },
+            }) 
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+            }
+            let nextCursor: typeof cursor | undefined = undefined;
+            if (rows.length > input.count) {
+                const nextItem = rows.pop();
+                nextCursor = nextItem?.id;
+            }
+            return {
+                rows,
+                nextCursor
+            };
+        }
+
+        const cellsQuery: Prisma.CellFindManyArgs = {
+            take: count + 1,
+            cursor: cursor ? {id: cursor} : undefined
+        }
+
+        if (filters) {
+            if (
+                filters.operator === "empty" ||
+                filters.operator === "is not empty"
+            ) {
+                const queryObj = buildQuery(filters.columnId, "" as string, filters.operator);
+                cellsQuery.where = {
+                    ...(cellsQuery.where ?? {}),
+                    columnId: filters.columnId,
+                    ...queryObj
+                }
+            } else if (filters.value !== undefined) {
+                const queryObj = buildQuery(filters.columnId, filters.value, filters.operator);
+                cellsQuery.where = {
+                    ...(cellsQuery.where ?? {}),
+                    columnId: filters.columnId,
+                    ...queryObj
+                }
+            } else {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "Filter value is required for this operator." });
+            }
+        }
+        console.log("the current cells query is: ",  cellsQuery);
+        // Gets filtered cells based on filter parameters
+        if (sort) {
+            cellsQuery.where = {
+                ...(cellsQuery.where ?? {}),
+                columnId: sort.columnId
+            }
+            cellsQuery.orderBy = {
+                    ...(sort.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
+            }
+        }
+        
+        const cells = await ctx.db.cell.findMany({
+            ...cellsQuery
+        })
+        if (!cells) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get cells!"})
+        }
+        const rowIds = cells.map(cell => cell.rowId);
+        let rows = await ctx.db.row.findMany({
+            take: input.count + 1,
+            where: {
+                id: { in: rowIds },
+                tableId: tableId
+            },
+            include: {
+                cells: true
+            },
+        })
+        if (!rows) {
+            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+        }
+
+        if (sort) {
+            const rowMap = new Map(rows.map(row => [row.id, row]));
+            rows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to sort rows!"});
+            }
+        }
+        
+        let nextCursor: typeof cursor | undefined = undefined;
+        if (cells.length > input.count) {
+            const nextItem = cells.pop();
+            nextCursor = nextItem?.id;
+        }
+        return {
+            rows, nextCursor
+        };
+        /* if (input.filters) {
             const cells = await ctx.db.cell.findMany({
                 take: input.count + 1,
                 where: {
-                    columnId: input.sort.columnId
-                },
-                orderBy: {
-                    ...(input.sort.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
+                    columnId: input.filters.columnId,
+                    stringValue: {
+                        equals: input.filters.string
+                    },
                 },
                 cursor: cursor ? {id: cursor} : undefined
-            })
+            });
             if (!cells) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get cells!"})
             }
-
             const rowIds = cells.map(cell => cell.rowId);
             let rows = await ctx.db.row.findMany({
                 take: input.count + 1,
@@ -139,15 +253,60 @@ export const rowRouter = createTRPCRouter({
             if (!rows) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
             }
-            //console.log("rows are:", rows);
-            const rowMap = new Map(rows.map(row => [row.id, row]));
-            rows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);
-            if (!rows) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to sort rows!"});
-            }
             let nextCursor: typeof cursor | undefined = undefined;
-            if (cells.length > input.count) {
-                const nextItem = cells.pop();
+            if (rows.length > input.count) {
+                const nextItem = rows.pop();
+                nextCursor = nextItem?.id;
+            }
+            if (!input.sort) {
+                return {
+                    rows,
+                    nextCursor
+                };
+            }
+        }
+        // TODO: account for the case when it is filtered but not sorted yet
+        if (input.sort) {
+            let cells;
+            if (!input.filters) {
+                const sortedCells = await ctx.db.cell.findMany({
+                take: input.count + 1,
+                where: {
+                    columnId: input.sort.columnId
+                },
+                orderBy: {
+                    ...(input.sort.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
+                },
+                cursor: cursor ? {id: cursor} : undefined
+            })
+                if (!sortedCells) {
+                    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get cells!"})
+                }
+                cells = sortedCells;
+            }
+            else {
+                cells = filteredCells;
+            }
+            
+
+            const rowIds = cells!.map(cell => cell.rowId);
+            let rows = await ctx.db.row.findMany({
+                take: input.count + 1,
+                where: {
+                    id: { in: rowIds }
+                },
+                include: {
+                    cells: true
+                },
+            })
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+            }
+            //console.log("rows are:", rows);
+            
+            let nextCursor: typeof cursor | undefined = undefined;
+            if (cells!.length > input.count) {
+                const nextItem = cells!.pop();
                 nextCursor = nextItem?.id;
             }
             return {
@@ -180,7 +339,7 @@ export const rowRouter = createTRPCRouter({
                 rows,
                 nextCursor
             };
-        }
+        } */
     }),
     deleteRow: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), rowId: z.string().min(1)}))
@@ -193,18 +352,6 @@ export const rowRouter = createTRPCRouter({
         if (!deleted) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete row!"})
         }
-        /* const updatePositions = await ctx.db.row.updateMany({
-            where: {
-                tableId: input.tableId,
-                position: { gt: deleted.position }
-            },
-            data: {
-                position: { decrement: 1}
-            }
-        });
-        if (!updatePositions) {
-            throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update positions!"})
-        } */
         const updateCount = await ctx.db.table.update({
             where: {
                 id: input.tableId

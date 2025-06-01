@@ -35,10 +35,11 @@ type TableProps = {
   columns: ColumnDef<RowData, any>[];
   tableId: string;
   sort: { columnId: string; order: "asc" | "desc" } | null;
-  handleSort: (columnId: string, order: "asc" | "desc") => void;
+  handleSort: (columnId: string | null, order: "asc" | "desc") => void;
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
+  filters?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | null;
 };
 
 type TableCellProps = {
@@ -103,8 +104,8 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
     return (
         <form className="w-full border-none bg-transparent focus:outline-none" onSubmit={handleSubmit}>
             <input
-                className="w-full border-none bg-transparent focus:outline-none"
-                value={value}
+                className="w-full border-none bg-white focus:outline-none"
+                value={value ?? ""}
                 onChange={e => setValue(e.target.value)}
                 onBlur={onBlur}
             />
@@ -114,7 +115,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
 
 
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table({rows: propRows, columns, tableId, sort, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage}: TableProps) {
+export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage}: TableProps) {
   const [ data, setData] = useState(() => [...propRows]);
   const [ page, setPage] = useState(0);
   const [dropdownCell, setDropdownCell] = useState<{
@@ -236,10 +237,10 @@ export function Table({rows: propRows, columns, tableId, sort, handleSort, fetch
   console.log("columns length: ", columns.length);
   function handleSortClick(columnId: string, order: "asc" | "desc"): void {
     handleSort(columnId, order);
-    void utils.row.getRows.invalidate
+    void utils.row.getRows.invalidate();
   }
   return (
-    <div className="flex flex-row overflow-auto relative" style={{height: 700}} ref={tableRef} >
+    <div className="flex flex-row overflow-auto relative" style={{height: 1000}} ref={tableRef} >
       <table className="table-fixed min-w-max">
       <thead className="grid sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
@@ -290,7 +291,7 @@ export function Table({rows: propRows, columns, tableId, sort, handleSort, fetch
         {table.getRowModel().rows.length === 0 ? (
           <tr>
             <td colSpan={columns.length} className="text-center py-4 text-gray-400">
-              No data
+              No data available for this filter!
             </td>
           </tr>
         ) : (

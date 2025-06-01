@@ -1,7 +1,9 @@
 
 import { BaseNavbar } from "../_components/ui/BaseNavbar";
 import  TableNavbar2  from "../_components/ui/TableNavbar2";
+import { TableNavbar } from "../_components/ui/TableNavbar";
 import { db } from "~/server/db";
+
 
 
 type Params = {
@@ -26,16 +28,14 @@ export default async function BaseLayout({ children, params }: {children: React.
     if (!base) {
         throw new Error("Base not found");
     }
-    const initialTableCount = base.tableCount;
     const tableCount = tables.length;
     return (
         <div>
-            <BaseNavbar baseId={base.id} baseName={base.name}>
-                <TableNavbar2 baseId={baseId} initialTables={tables} tableCount={tableCount}>
-                    {children}
-                </TableNavbar2>
+            <BaseNavbar baseId={base.id} baseName={base.name}>  
+                <TableNavbar baseId={base.id} initialTables={tables} />
+                {children}
             </BaseNavbar>
-                
+
         </div>
     )
 }
