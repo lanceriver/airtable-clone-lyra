@@ -152,9 +152,21 @@ export const tableRouter = createTRPCRouter({
                 });
             }
             }
+            const view = await ctx.db.view.create({
+                data: {
+                    name: "Default View",
+                    tableId: table.id,
+                    filters: undefined,
+                    sort: undefined // No filters by default
+                }
+            })
+            if (!view) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create default view!" });
+            }
             await ctx.db.table.update({
                 where: { id: table.id },
                 data: {
+                    activeViewId: view.id, // Set the default view as the active view
                     rowCount: {
                         increment: 1 // Increment the row count by 1 for the extra row
                     }
@@ -179,6 +191,22 @@ export const tableRouter = createTRPCRouter({
                 orderBy: { createdAt: "asc"}
             }); 
     }),
+    queryTable: protectedProcedure
+        .input(z.object( { id: z.string().min(1)}))
+        .query(async ({ ctx, input}) => {
+            const table = await ctx.db.table.findUnique({
+                where: { id: input.id },
+                select: {
+                    activeViewId: true,
+                    columns: true,
+                    views: true,
+                }
+            })
+            if (!table) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "Table not found!" });
+            }
+            return table;
+        }),
     deleteTable: protectedProcedure
         .input(z.object({ id: z.string().min(1)}))
         .mutation(async ({ ctx, input} ) => {

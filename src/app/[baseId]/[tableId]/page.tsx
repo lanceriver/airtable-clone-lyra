@@ -1,16 +1,13 @@
 "use client";
 import { Table } from "~/app/_components/ui/Table";
 import TableNavbar2 from "~/app/_components/ui/TableNavbar2";
-import { faker } from "@faker-js/faker";
-import { generateFakeData } from "~/app/_components/ui/Table";
-import { db } from "~/server/db";
 import { use } from "react";
 import { api } from "~/trpc/react"; 
 import {
   createColumnHelper
 } from "@tanstack/react-table"; 
 import { useMemo, useState, useEffect } from "react";
-import { set } from "zod";
+import { toast } from "sonner";
 import { TableCell } from "~/app/_components/ui/Table";
 import type { CellContext } from "@tanstack/react-table";
 
@@ -57,14 +54,102 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const [sort, setSort] = useState<{ columnId: string; order: "asc" | "desc" } | null>(null);
     const [filters, setFilters] = useState<{ columnId: string; columnName?: string; value?: string | number; operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty"; } | null>(null);
 
+    const { data: activeView, isLoading: isActiveViewLoading } = api.view.getActiveView.useQuery({
+        tableId: params.tableId,
+    });
+
+    const viewFilters = activeView?.filters;
+    const viewSort = activeView?.sort;
+    console.log("Active view filters:", viewFilters);
+    console.log("Active view sort:", viewSort);
+
     const handleSort = (columnId: string | null, order: "asc" | "desc") => {
         if (columnId === null) {
             setSort(null);
-            void utils.row.getRows.invalidate();
+            updateView({
+                id: activeView?.id ?? "",
+                sort: null,
+            });
             return;
         }
         setSort({ columnId, order});
+        updateView({
+            id: activeView?.id ?? "",
+            sort: { columnId, order},
+            filters: filters?.operator
+                ? {
+                    columnId: filters.columnId,
+                    operator: filters.operator,
+                    value: filters.value,
+                }
+                : null, // Keep existing filters if any
+        })
     }
+
+    useEffect(() => {
+  if (
+    viewSort &&
+    typeof viewSort === "object" &&
+    "columnId" in viewSort &&
+    "order" in viewSort
+  ) {
+    const sortObj = viewSort as { columnId: unknown; order: unknown };
+    if (
+      typeof sortObj.columnId === "string" &&
+      (sortObj.order === "asc" || sortObj.order === "desc")
+    ) {
+      // Now we know the types are safe and can call handleSort.
+      handleSort(sortObj.columnId, sortObj.order);
+    } else {
+      setSort(null);
+    }
+  } else {
+    setSort(null);
+  }
+}, [viewSort]);
+    // Handle viewFilters if it's a JSON string or object
+    useEffect(() => {
+        let parsedFilters: unknown = viewFilters;
+        if (typeof viewFilters === "string") {
+            try {
+                parsedFilters = JSON.parse(viewFilters);
+            } catch (e) {
+                parsedFilters = null;
+            }
+        }
+        if (
+            parsedFilters &&
+            typeof parsedFilters === "object" &&
+            "columnId" in parsedFilters
+        ) {
+            setFilters(parsedFilters as {
+                columnId: string;
+                columnName?: string;
+                value?: string | number;
+                operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+            });
+        } else {
+            setFilters(null);
+        }
+    }, [viewFilters]);
+
+    const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
+        tableId: params.tableId,
+    });
+
+    const { mutate: updateView } = api.view.updateView.useMutation({
+        onSuccess: () => {
+            console.log("View updated successfully");
+            void utils.view.getActiveView.invalidate();
+            void utils.view.getViews.invalidate();
+            void utils.row.getRows.invalidate();
+        },
+        onError: (error) => {
+            toast.error(`Failed to update view: ${error.message}`);
+        }
+    });
+
+    
 
     const handleFilters = (
         columnId: string | null,
@@ -74,10 +159,21 @@ export default function BasePage(props: { params: Promise<Params> }) {
     ) => {
         if (columnId === null) {
             setFilters(null);
-            void utils.row.getRows.invalidate();
+            updateView({
+                id: activeView?.id ?? "",
+                filters: null
+            });
             return;
         }
         setFilters({columnId, columnName, operator, value});
+        updateView({
+            id: activeView?.id ?? "",
+            filters: {
+                columnId: columnId,
+                operator: operator ?? "contains",
+                value: value ?? undefined,
+            }
+        })
     }
 
     const baseId = params.baseId;
@@ -170,7 +266,7 @@ const loading = isColumnsLoading || isLoading;
         tableColumns.push(...returnedColumns);
     }
     return (
-        <div className="flex flex-col">
+        <div className="flex flex-col overflow-auto h-full">
             <TableNavbar2 baseId={baseId} initialTables={tables ?? []} tableCount={tableCount} tableId={tableId}  handleFilters={handleFilters} columnMap={columnMap} handleSort={handleSort}>   
                     <Table rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort} fetchNextPage={fetchNextPage} isFetchingNextPage={isFetchingNextPage} hasNextPage={hasNextPage}/>
             </TableNavbar2>

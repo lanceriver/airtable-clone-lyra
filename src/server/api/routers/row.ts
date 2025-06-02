@@ -177,7 +177,6 @@ export const rowRouter = createTRPCRouter({
                 throw new TRPCError({ code: "BAD_REQUEST", message: "Filter value is required for this operator." });
             }
         }
-        console.log("the current cells query is: ",  cellsQuery);
         // Gets filtered cells based on filter parameters
         if (sort) {
             cellsQuery.where = {
@@ -209,7 +208,6 @@ export const rowRouter = createTRPCRouter({
         if (!rows) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
         }
-
         if (sort) {
             const rowMap = new Map(rows.map(row => [row.id, row]));
             rows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);

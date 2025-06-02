@@ -56,6 +56,7 @@ type Table = {
     colCount: number;
     rowCount: number;
     seed: number | null;
+    activeViewId: string | null;
 };
 
 type NavbarProps = {
@@ -93,8 +94,12 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
   };
 
   const handleSubmitFilters = () => {
-    if (!columnName || !operator || value === "") {
+    if (!columnName || !operator) {
       toast.error("Please select a column, operator, and provide a value.");
+      return;
+    }
+    if (value === null && operator !== "empty" && operator !== "is not empty") {
+      toast.error("Please provide a value for the selected operator.");
       return;
     }
     if (
@@ -110,13 +115,18 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         toast.error("Invalid column selected");
         return;
     }
-      handleFilters(columnId, columnName, operator, value);
+      let filterValue: string | number | undefined = value ?? undefined;
+      if (operator === "empty" || operator === "is not empty") {
+        setValue("");
+        filterValue = undefined;
+      }
+      handleFilters(columnId, columnName, operator, filterValue);
       
       console.log("Filters submitted:", {
         columnId,
         columnName,
         operator,
-        value,
+        value: filterValue,
       });
       setIsOpen(false);
     }
@@ -172,6 +182,8 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     "empty",
     "is not empty"
   ];
+
+  const operatorRequiresValue = operator !== "empty" && operator !== "is not empty";
 
   return (
     <div className="flex flex-col h-screen">
@@ -261,7 +273,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
                   </SelectGroup>
                 </SelectContent>
               </Select>
-                    <Input placeholder="Value" className="text-sm" value={value} onChange={(e) => setValue(e.target.value)}/>
+              {operatorRequiresValue && (
+                <Input placeholder="Value" className="text-sm" value={value} onChange={(e) => setValue(e.target.value)}/>
+              )}
               <TrashIcon className="h-20 w-20 hover:text-red-500 cursor-pointer" onClick={() => handleClearFilters()}/>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSubmitFilters}>
@@ -324,11 +338,13 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           variant="ghost"
           size="sm"
           className="h-8 gap-1"
+          disabled={is100KPending}
           onClick={() => {
           create100krows({ tableId: tableId});
         }}
         >
-        Add 100k rows
+        {!is100KPending && <span>Add 100k rows</span>}
+        {is100KPending && <span className="animate-pulse">Adding 100k rows...</span>}
         </Button>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -371,7 +387,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         {/* Sidebar */}
            <TableSidebar></TableSidebar>
         {/* Main content area - left blank for user to implement */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 overflow-hidden">
           {children}
         </div>
       </div>

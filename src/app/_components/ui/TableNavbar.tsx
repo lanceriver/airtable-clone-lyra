@@ -18,6 +18,7 @@ type Table = {
     colCount: number;
     rowCount: number;
     seed: number | null;
+    activeViewId: string | null;
 };
 
 
@@ -46,16 +47,16 @@ export function TableNavbar({baseId, initialTables, navbarColor}: {baseId: strin
 
     const darkerColorMap: Record<string, string> = {
             "bg-blue-700": "bg-blue-900/90",
-            "bg-red-700": "bg-red-900/90",
+            "bg-red-700": "bg-[#d54402]/90",
             "bg-green-700": "bg-green-900/90",
             "bg-orange-700": "bg-orange-900/90",
             "bg-amber-700": "bg-amber-900/90",
             "bg-purple-700": "bg-purple-900/90",
     };
-    const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-gray-900/90") : "bg-gray-900/90";
+    const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-[#c23d04]") : "bg-[#c23d04]";
     return (
         <div className="flex flex-col">
-            <div className={`flex items-center ${tableNavbarColor}  text-black font-normal py-0`}>
+            <div className={`flex items-center bg-[#c23d04] text-black font-normal py-0`}>
                 {tables?.map((table) => (             
                                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""} handleSelectTab={handleSelectTab}/>
                           ))}

@@ -29,9 +29,20 @@ export function CreateTableForm({ baseId, onSuccess, handleSelectTab }: { baseId
             console.error("Error creating table:", error);
         }
     }); 
+
+    const { mutate: createView } = api.view.createView.useMutation({
+        onSuccess: () => {
+            void utils.view.getViews.invalidate();
+        },
+        onError: (error) => {
+            toast.error(`Failed to create view: ${error.message}`);
+        }
+    })
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const seed = Math.floor(Math.random() * 1000000);
+        
         createTable({ baseId, name: tableName, colCount, rowCount, seed }, {
             onSuccess: (createdTable) => {
                 setTableName("");

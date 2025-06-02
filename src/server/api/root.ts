@@ -3,7 +3,9 @@ import { tableRouter } from "~/server/api/routers/table";
 import { columnRouter } from "./routers/column";
 import { rowRouter } from "./routers/row";
 import { cellRouter } from "./routers/cell";
+import { viewRouter } from "./routers/view";
 import { createCallerFactory, createTRPCRouter } from "~/server/api/trpc";
+import { O } from "node_modules/@faker-js/faker/dist/airline-BUL6NtOJ";
 
 /**
  * This is the primary router for your server.
@@ -16,6 +18,7 @@ export const appRouter = createTRPCRouter({
   column: columnRouter,
   row: rowRouter,
   cell: cellRouter,
+  view: viewRouter,
 });
 
 // export type definition of API
