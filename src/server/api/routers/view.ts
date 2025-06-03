@@ -128,17 +128,31 @@ export const viewRouter = createTRPCRouter({
 
             const { name, filters, sort } = input;
             
-            const updateData = {
-      // For a string field, you can either force a default if it's undefined (here using an empty string)...
+            /* const updateData = {
+                name: name ?? undefined, 
                 filters: filters ?? Prisma.JsonNull,
                 sort: sort ?? Prisma.JsonNull
-            };
+            }; */
 
             /* const updateData: any = {};
             updateData.name = input.name;
             updateData.filters = input.filters;
             updateData.sort = input.sort;
             console.log("Update data prepared:", updateData); */
+
+            const updateData: Record<string, unknown> = {};
+        
+            if ('name' in input && input.name !== undefined) {
+                updateData.name = input.name;
+            }
+        
+            if ('filters' in input && input.filters !== undefined) {
+                updateData.filters = input.filters ?? Prisma.JsonNull;
+            }
+        
+            if ('sort' in input && input.sort !== undefined) {
+                updateData.sort = input.sort ?? Prisma.JsonNull;
+            }
 
             const view = await ctx.db.view.update({
                 where: { id: input.id },

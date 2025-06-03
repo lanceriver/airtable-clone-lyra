@@ -6,19 +6,11 @@ import { toast } from "sonner"
 import {
   Calendar,
   ChevronDown,
-  ChevronRight,
   Grid,
   LayoutGrid,
   List,
-  Menu,
   Plus,
   Search,
-  Share2,
-  Sliders,
-  ArrowUpDown,
-  EyeOff,
-  Palette,
-  Filter,
   Check,
 } from "lucide-react"
 import { Button } from "~/components/ui/button"
@@ -30,6 +22,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover"
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "~/components/ui/context-menu"
 
 type SidebarProps = {
   tableId: string;
@@ -52,19 +50,46 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
 
   const [createExpanded, setCreateExpanded] = useState(true);
   const [viewName, setViewName] = useState("");
+  const [isEditing, setIsEditing] = useState(false);
+  const [editName, setEditName] = useState("");
+
+  console.log("TableSidebar props:", {
+    tableId,
+    filters,
+    sort,
+    activeViewId,
+    handleViewChange,
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (viewName === "") {
-      toast.error("Please enter a view name.");
+    if (isEditing) {
+      // Update existing view
+      if (editName === "") {
+        toast.error("Please enter a new name for the view.");
+        return;
+      }
+      updateView({
+        id: activeViewId ?? "",
+        name: editName,
+      });
+      setIsEditing(false);
+      setEditName("");
       return;
     }
-    createView({ 
+    else {
+      if (viewName === "") {
+        toast.error("Please enter a view name.");
+        return;
+      } 
+      createView({ 
       name: viewName, 
       tableId: tableId, 
       filters: undefined,
       sort: undefined,
     });
+    }
+    
   }
 
   const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
@@ -73,7 +98,6 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
 
   const { mutate: createView } = api.view.createView.useMutation({
     onSuccess: (newView) => {
-
       void utils.view.getViews.invalidate();
       toast.success(`View "${newView.name}" created successfully!`);
     },
@@ -82,6 +106,26 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
     }
   });
 
+  const { mutate: updateView } = api.view.updateView.useMutation({
+    onSuccess: (newView) => {
+      void utils.view.getViews.invalidate();
+      toast.success(`View "${newView.name}" updated successfully!`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to update view: ${error.message}`);
+    }
+  })
+
+  const { mutate: deleteView } = api.view.deleteView.useMutation({
+    onSuccess: () => {
+      void utils.view.getViews.invalidate();
+      toast.success(`View deleted successfully!`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to delete view: ${error.message}`);
+    }
+  })
+ 
   const handleViewClick = (viewId: string) => {
     handleViewChange?.(viewId);
   }
@@ -99,12 +143,23 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
 
               {views?.map(view => (
                 <div key={view.id} className="w-full">
-                  <Button variant="ghost" className={`w-full justify-start gap-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100 mb-4`}
-                  onClick={() => handleViewClick(view.id)}>
-                    <Grid className="h-4 w-4 text-blue-600" />
-                  <span key={view.id} className="text-sm">{view.name}</span>
-                  <Check className="ml-auto h-4 w-4 text-gray-600" />
-                </Button>
+                <ContextMenu>
+                  <ContextMenuTrigger className="flex items-center w-full">
+                        <Button variant="ghost" className={`w-full justify-start gap-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100 mb-4`}
+                          onClick={() => handleViewClick(view.id)}>
+                          <Grid className="h-4 w-4 text-blue-600" />  
+                              {isEditing && view.id === activeViewId ? <form onSubmit={handleSubmit}>
+                                  <Input value={editName || viewName} onChange={(e) => setEditName(e.target.value)}></Input>
+                                </form> : <span key={view.id} className="text-sm">{view.name}</span>}
+                          <Check className="ml-auto h-4 w-4 text-gray-600" />
+                        </Button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-48">
+                      <ContextMenuItem onClick={() => setIsEditing(true)}>Rename view</ContextMenuItem>
+                      <ContextMenuItem onClick={() => deleteView({id: view.id})}>Delete view</ContextMenuItem>
+                    </ContextMenuContent>
+                  </ContextMenu>
+                
                 </div>
                 
               ))}

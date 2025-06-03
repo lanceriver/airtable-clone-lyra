@@ -35,11 +35,13 @@ type TableProps = {
   columns: ColumnDef<RowData, any>[];
   tableId: string;
   sort: { columnId: string; order: "asc" | "desc" } | null;
+  filterColumnId?: string | null;
   handleSort: (columnId: string | null, order: "asc" | "desc") => void;
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   filters?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | null;
+  
 };
 
 type TableCellProps = {
@@ -115,7 +117,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
 
 
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage}: TableProps) {
+export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filterColumnId}: TableProps) {
   const [ data, setData] = useState(() => [...propRows]);
   const [ page, setPage] = useState(0);
   const [dropdownCell, setDropdownCell] = useState<{
@@ -219,7 +221,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
       count: hasNextPage ? rows.length + 1 : rows.length,
       estimateSize: () => 10,
       getScrollElement: () => tableRef.current,
-      overscan: 20,
+      overscan: 30,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   
@@ -249,21 +251,27 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
               <React.Fragment key={header.id}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
-                  <th className={`border px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`}
-                  style={header.column.id !== 'id' ? {width: `${header.column.getSize()}px`, minWidth: `${header.column.getSize()}px`, maxWidth: `${header.column.getSize()}px`} : {}}
-                  >
-                {header.isPlaceholder ? null : (
-                <div className="flex justify-between items-center gap-2 text-xs font-normal py-2">
-                {flexRender(header.column.columnDef.header, header.getContext())}
-                {header.index !== 0 && (
-                  <ColumnDropdown
-                  columnId={header.column.id}
-                  columnName={header.column.columnDef.header as string}
-                  tableId={tableId}
-                  />
-                )}   
-                </div>
-                )}
+                <th
+                  className={`border px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === header.column.id ? 'bg-blue-50' : ''}`}
+                  style={header.column.id !== 'id' ? { width: `${header.column.getSize()}px`, minWidth: `${header.column.getSize()}px`, maxWidth: `${header.column.getSize()}px` } : {}}
+                >
+                  {header.isPlaceholder ? null : (
+                    <div className="flex justify-between items-center gap-2 text-xs font-normal py-2">
+                      {flexRender(header.column.columnDef.header, header.getContext())}
+                      {sort?.columnId === header.column.id && (
+                        <span className="text-blue-500">
+                          {sort.order === "asc" ? "↑" : "↓"}
+                        </span>
+              )}
+                      {header.index !== 0 && (
+                        <ColumnDropdown
+                          columnId={header.column.id}
+                          columnName={header.column.columnDef.header as string}
+                          tableId={tableId}
+                        />
+                      )}
+                    </div>
+                  )}
                 </th>
                   </ContextMenuTrigger>
                   <ContextMenuContent>
@@ -320,7 +328,10 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                 {row.getVisibleCells().map((cell, colIdx) => (
                   <ContextMenu key={colIdx}>
                     <ContextMenuTrigger asChild>
-                      <td key={cell.id} className={`border flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`} style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
+                      <td key={cell.id} className={`border flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 
+                            ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
+                            ${filterColumnId === cell.column.id ? 'bg-[#eafbeb]' : ''}`} 
+                            style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 
                             ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>

@@ -44,6 +44,14 @@ type ColumnData = {
     position: number;
 }
 
+type PageData = {
+    rows: RowData[];
+    nextCursor?: {
+        id?: string;
+        value?: string | number;
+    } | null;
+};
+
 const columnHelper = createColumnHelper<ColumnData>();
 
 
@@ -75,6 +83,8 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const viewSort = activeViewData?.sort;
     console.log("Active view filters:", viewFilters);
     console.log("Active view sort:", viewSort);
+
+    const filteredColumn = viewFilters?.columnId ?? null;
 
     const handleSort = (columnId: string | null, order: "asc" | "desc") => {
         if (columnId === null) {
@@ -177,7 +187,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
     console.log("next rows are:", nextRows);
     
     const flattened = useMemo(
-        () => nextRows?.pages?.flatMap((page) => page?.rows) ?? [],
+        () => nextRows?.pages?.flatMap((page: PageData | undefined) => page?.rows) ?? [],
         [nextRows]
     );
     console.log(flattened);
@@ -221,8 +231,30 @@ const loading = isColumnsLoading || isLoading;
     }
     return (
         <div className="flex flex-col overflow-auto h-full">
-            <TableNavbar2 baseId={baseId} initialTables={tables ?? []} tableCount={tableCount} tableId={tableId} handleFilters={handleFilters} columnMap={columnMap} handleSort={handleSort} activeViewId={viewId} handleViewChange={handleViewChange}>   
-                    <Table rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} handleSort={handleSort} fetchNextPage={fetchNextPage} isFetchingNextPage={isFetchingNextPage} hasNextPage={hasNextPage}/>
+            <TableNavbar2
+                baseId={baseId}
+                initialTables={tables ?? []}
+                tableCount={tableCount}
+                tableId={tableId}
+                handleFilters={handleFilters}
+                columnMap={columnMap}
+                handleSort={handleSort}
+                activeViewId={viewId}
+                handleViewChange={handleViewChange}
+                sort={viewSort ?? null}
+                filters={viewFilters ?? null}
+            >
+                <Table
+                    rows={tableRows ?? []}
+                    columns={tableColumns ?? []}
+                    tableId={tableId}
+                    handleSort={handleSort}
+                    fetchNextPage={fetchNextPage}
+                    isFetchingNextPage={isFetchingNextPage}
+                    hasNextPage={hasNextPage}
+                    sort={viewSort ?? null}
+                    filterColumnId={filteredColumn}
+                />
             </TableNavbar2>
             
         </div>

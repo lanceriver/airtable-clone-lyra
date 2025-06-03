@@ -1,3 +1,13 @@
+/* eslint-disable
+  @typescript-eslint/no-inferrable-types,
+  @typescript-eslint/prefer-optional-chain,
+  @typescript-eslint/no-unused-expressions,
+  @typescript-eslint/no-explicit-any,
+  @typescript-eslint/no-unsafe-assignment,
+  @typescript-eslint/no-unsafe-call,
+  @typescript-eslint/no-unsafe-member-access,
+  @typescript-eslint/prefer-nullish-coalescing
+*/
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import {
@@ -42,7 +52,7 @@ const buildSqlQuery = (
     tableId: string,
     filters?: { columnId: string; operator: Operator; value?: string | number }[],
     sort?: { columnId: string; order: string },
-    cursor?: {id: string | null | undefined, value?: string | number | null},
+    cursor?: {id?: string | null | undefined, value?: string | number | null},
     count: number = 100
 ) => {
 
@@ -79,6 +89,12 @@ const buildSqlQuery = (
                 AND ${buildFilterQuery(index, filter, params)} 
             )`;
         }); 
+    }
+
+    else if (cursor && cursor.id !== undefined && cursor.id !== null) {
+        params.push(cursor.id);
+        console.log("params after cursor:", params);
+        query += `AND r.id > $${params.length}`
     }
 
     query += `
@@ -118,10 +134,7 @@ const buildSqlQuery = (
             r.id ASC`;
         }
     }
-    else if (cursor && cursor.id !== undefined && cursor.id !== null) {
-        params.push(cursor.id);
-        query += `AND r.id > $${params.length}  ORDER BY r.id ASC`;
-    }
+    
 
     params.push(count + 1);
     query += `
@@ -258,7 +271,6 @@ export const rowRouter = createTRPCRouter({
                 nextCursor = {
                         id: nextItem?.id,
                 }
-                nextItem?.id;
             }
             return {
                 rows,
@@ -269,7 +281,13 @@ export const rowRouter = createTRPCRouter({
         if (filters || sort) {
             console.log(cursor);
             console.log(count);
-            const { query, params } = buildSqlQuery(tableId, filters ? [filters] : undefined, sort, cursor, count + 1);
+            const { query, params } = buildSqlQuery(
+                tableId,
+                filters ? [filters] : undefined,
+                sort,
+                cursor ?? undefined,
+                count + 1
+            );
             const rows = await ctx.db.$queryRawUnsafe<any[]>(query, ...params);
             if (!rows) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
