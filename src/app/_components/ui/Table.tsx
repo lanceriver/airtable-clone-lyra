@@ -102,9 +102,9 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
         }
     }
     return (
-        <form className="w-full border-none bg-transparent focus:outline-none" onSubmit={handleSubmit}>
+        <form className="w-full border-none bg-transparent focus:outline-none focus:bg-white" onSubmit={handleSubmit}>
             <input
-                className="w-full border-none bg-white focus:outline-none"
+                className="w-full border-none bg-transparent focus:outline-none focus:bg-white"
                 value={value ?? ""}
                 onChange={e => setValue(e.target.value)}
                 onBlur={onBlur}
@@ -306,20 +306,21 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                 ref={node => { if (node) {
                     rowVirtualizer.measureElement(node)} // measure dynamic row height
                 }}
-                key={row.id}
+                key={`${row.id}-${virtualRow.index}`}
+                className="hover:bg-gray-100 transition-colors duration-200 relative"
                 style={{
                   display: 'flex',
                   transform: `translateY(${virtualRow.start}px)`,
                   top: 0,
                   left: 0,
                   position: 'absolute',
-                  width: "100%"
+                  width: "100%",
                 }}
               >
                 {row.getVisibleCells().map((cell, colIdx) => (
-                  <ContextMenu key={cell.id}>
+                  <ContextMenu key={colIdx}>
                     <ContextMenuTrigger asChild>
-                      <td key={cell.id} className={`border flex px-2 py-1 text-xs ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`} style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
+                      <td key={cell.id} className={`border flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''}`} style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 
                             ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>

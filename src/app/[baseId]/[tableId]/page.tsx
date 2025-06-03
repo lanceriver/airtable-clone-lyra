@@ -10,6 +10,7 @@ import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
 import { TableCell } from "~/app/_components/ui/Table";
 import type { CellContext } from "@tanstack/react-table";
+import { useRouter, useSearchParams } from "next/navigation";
 
 // Dynamically generate column defs based on shape of data returned from backend, should make it more scalable
 
@@ -49,93 +50,46 @@ const columnHelper = createColumnHelper<ColumnData>();
 
 export default function BasePage(props: { params: Promise<Params> }) {  
     const utils = api.useUtils(); 
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const params = use(props.params);
-    const seed = params.seed;
-    const [sort, setSort] = useState<{ columnId: string; order: "asc" | "desc" } | null>(null);
-    const [filters, setFilters] = useState<{ columnId: string; columnName?: string; value?: string | number; operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty"; } | null>(null);
 
-    const { data: activeView, isLoading: isActiveViewLoading } = api.view.getActiveView.useQuery({
+    const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
         tableId: params.tableId,
     });
 
-    const viewFilters = activeView?.filters;
-    const viewSort = activeView?.sort;
+    const viewId = searchParams.get("viewId") ?? views?.[0]?.id;
+    console.log("viewId from search params:", viewId);
+    
+    const activeViewData = useMemo(() => 
+        views?.find(view => view.id === viewId),
+        [views, viewId]
+    );
+
+    const handleViewChange = (viewId: string) => {
+        router.push(`/${params.baseId}/${params.tableId}?viewId=${viewId}`);
+    }
+    console.log("activeViewData:", activeViewData);
+
+    const viewFilters = activeViewData?.filters;
+    const viewSort = activeViewData?.sort;
     console.log("Active view filters:", viewFilters);
     console.log("Active view sort:", viewSort);
 
     const handleSort = (columnId: string | null, order: "asc" | "desc") => {
         if (columnId === null) {
-            setSort(null);
             updateView({
-                id: activeView?.id ?? "",
+                id: activeViewData?.id ?? "",
                 sort: null,
             });
             return;
         }
-        setSort({ columnId, order});
         updateView({
-            id: activeView?.id ?? "",
+            id: activeViewData?.id ?? "",
             sort: { columnId, order},
-            filters: filters?.operator
-                ? {
-                    columnId: filters.columnId,
-                    operator: filters.operator,
-                    value: filters.value,
-                }
-                : null, // Keep existing filters if any
+            filters: viewFilters
         })
     }
-
-    useEffect(() => {
-  if (
-    viewSort &&
-    typeof viewSort === "object" &&
-    "columnId" in viewSort &&
-    "order" in viewSort
-  ) {
-    const sortObj = viewSort as { columnId: unknown; order: unknown };
-    if (
-      typeof sortObj.columnId === "string" &&
-      (sortObj.order === "asc" || sortObj.order === "desc")
-    ) {
-      // Now we know the types are safe and can call handleSort.
-      handleSort(sortObj.columnId, sortObj.order);
-    } else {
-      setSort(null);
-    }
-  } else {
-    setSort(null);
-  }
-}, [viewSort]);
-    // Handle viewFilters if it's a JSON string or object
-    useEffect(() => {
-        let parsedFilters: unknown = viewFilters;
-        if (typeof viewFilters === "string") {
-            try {
-                parsedFilters = JSON.parse(viewFilters);
-            } catch (e) {
-                parsedFilters = null;
-            }
-        }
-        if (
-            parsedFilters &&
-            typeof parsedFilters === "object" &&
-            "columnId" in parsedFilters
-        ) {
-            setFilters(parsedFilters as {
-                columnId: string;
-                columnName?: string;
-                value?: string | number;
-                operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
-            });
-        } else {
-            setFilters(null);
-        }
-    }, [viewFilters]);
-
-    const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
-        tableId: params.tableId,
-    });
 
     const { mutate: updateView } = api.view.updateView.useMutation({
         onSuccess: () => {
@@ -158,21 +112,20 @@ export default function BasePage(props: { params: Promise<Params> }) {
         value?: string | number
     ) => {
         if (columnId === null) {
-            setFilters(null);
             updateView({
-                id: activeView?.id ?? "",
+                id: activeViewData?.id ?? "",
                 filters: null
             });
             return;
         }
-        setFilters({columnId, columnName, operator, value});
         updateView({
-            id: activeView?.id ?? "",
+            id: activeViewData?.id ?? "",
             filters: {
                 columnId: columnId,
                 operator: operator ?? "contains",
                 value: value ?? undefined,
-            }
+            },
+            sort: viewSort
         })
     }
 
@@ -185,7 +138,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const id = useMemo(() => {
         return tableId;
     }, [tableId]);
-    const tableName = params.tableName;
+
 
     console.log("Current tableId:", tableId);
     
@@ -199,33 +152,34 @@ export default function BasePage(props: { params: Promise<Params> }) {
             });
 
     // Ensure filters matches the expected type: no columnName, operator is required if filters is present
-    const formattedFilters = filters?.operator
+    /* const formattedFilters = viewFilters?.operator
         ? {
             columnId: filters.columnId,
             operator: filters.operator,
             value: filters.value,
         }
         : undefined;
-
+ */
     const { data: nextRows, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = api.row.getRows.useInfiniteQuery(
         {
             tableId: tableId,
             count: 100,
             offset: 0,
-            ...(sort != null && { sort }),
-            ...(formattedFilters != null && { filters: formattedFilters }),
+            ...(viewFilters ? { filters: viewFilters } : {}),
+            ...(viewSort ? { sort: viewSort } : {}),
         },
         {
             initialCursor: null,
-            getNextPageParam: (lastPage) => lastPage.nextCursor
+            getNextPageParam: (lastPage) => lastPage?.nextCursor
         });
-     console.log(tableId);
+
+    console.log(tableId);
     console.log("next rows are:", nextRows);
+    
     const flattened = useMemo(
-        () => nextRows?.pages?.flatMap((page) => page.rows) ?? [],
+        () => nextRows?.pages?.flatMap((page) => page?.rows) ?? [],
         [nextRows]
     );
-    console.log(sort);
     console.log(flattened);
 
 // Choose which data to use
@@ -267,8 +221,8 @@ const loading = isColumnsLoading || isLoading;
     }
     return (
         <div className="flex flex-col overflow-auto h-full">
-            <TableNavbar2 baseId={baseId} initialTables={tables ?? []} tableCount={tableCount} tableId={tableId}  handleFilters={handleFilters} columnMap={columnMap} handleSort={handleSort}>   
-                    <Table rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} sort={sort} handleSort={handleSort} fetchNextPage={fetchNextPage} isFetchingNextPage={isFetchingNextPage} hasNextPage={hasNextPage}/>
+            <TableNavbar2 baseId={baseId} initialTables={tables ?? []} tableCount={tableCount} tableId={tableId} handleFilters={handleFilters} columnMap={columnMap} handleSort={handleSort} activeViewId={viewId} handleViewChange={handleViewChange}>   
+                    <Table rows={tableRows ?? []} columns={tableColumns ?? []} tableId={tableId} handleSort={handleSort} fetchNextPage={fetchNextPage} isFetchingNextPage={isFetchingNextPage} hasNextPage={hasNextPage}/>
             </TableNavbar2>
             
         </div>

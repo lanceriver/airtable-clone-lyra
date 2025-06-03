@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { api } from "~/trpc/react"
+import { toast } from "sonner"
 import {
   Calendar,
   ChevronDown,
@@ -23,12 +25,68 @@ import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Separator } from "~/components/ui/separator"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover"
+
+type SidebarProps = {
+  tableId: string;
+  filters: {
+    columnId: string;
+    columnName?: string;
+    value?: string | number;
+    operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+  } | null,
+  sort: {
+    columnId: string;
+    order: "asc" | "desc";  
+  } | null,
+  activeViewId?: string;
+  handleViewChange?: (viewId: string) => void;
+};
+
+export default function TableSidebar({ tableId, filters, sort, activeViewId, handleViewChange }: SidebarProps) {
+  const utils = api.useUtils()
+
+  const [createExpanded, setCreateExpanded] = useState(true);
+  const [viewName, setViewName] = useState("");
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (viewName === "") {
+      toast.error("Please enter a view name.");
+      return;
+    }
+    createView({ 
+      name: viewName, 
+      tableId: tableId, 
+      filters: undefined,
+      sort: undefined,
+    });
+  }
+
+  const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
+    tableId: tableId
+  });
+
+  const { mutate: createView } = api.view.createView.useMutation({
+    onSuccess: (newView) => {
+
+      void utils.view.getViews.invalidate();
+      toast.success(`View "${newView.name}" created successfully!`);
+    },
+    onError: (error) => {
+      toast.error(`Failed to create view: ${error.message}`);
+    }
+  });
+
+  const handleViewClick = (viewId: string) => {
+    handleViewChange?.(viewId);
+  }
 
 
-export default function TableSidebar() {
-  const [selectedTab, setSelectedTab] = useState("Table 1")
-  const [viewsExpanded, setViewsExpanded] = useState(true)
-  const [createExpanded, setCreateExpanded] = useState(true)
 
   return (
     <div className="flex overflow-hidden">
@@ -39,11 +97,18 @@ export default function TableSidebar() {
               <Input placeholder="Find a view" className="pl-8 h-9 text-sm" />
             </div>
 
-            <Button variant="ghost" className="w-full justify-start gap-2 bg-blue-50 hover:bg-blue-100 mb-4">
-              <Grid className="h-4 w-4 text-blue-600" />
-              <span className="text-sm">Grid view</span>
-              <Check className="ml-auto h-4 w-4 text-gray-600" />
-            </Button>
+              {views?.map(view => (
+                <div key={view.id} className="w-full">
+                  <Button variant="ghost" className={`w-full justify-start gap-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100 mb-4`}
+                  onClick={() => handleViewClick(view.id)}>
+                    <Grid className="h-4 w-4 text-blue-600" />
+                  <span key={view.id} className="text-sm">{view.name}</span>
+                  <Check className="ml-auto h-4 w-4 text-gray-600" />
+                </Button>
+                </div>
+                
+              ))}
+
 
             {/* Create section */}
             <Collapsible open={createExpanded} onOpenChange={setCreateExpanded} className="border-t pt-4">
@@ -61,9 +126,27 @@ export default function TableSidebar() {
                     <Grid className="h-4 w-4 text-blue-600" />
                     <span className="text-sm">Grid</span>
                   </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
-                    <Plus className="h-4 w-4" />
-                  </Button>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-4">
+                      <div className="mb-4">
+                        <Input placeholder="Enter view name" className="w-full" onChange={(e) => setViewName(e.target.value)}/>
+                      </div>
+                      <div className="flex flex-2 gap-x-2">
+                        <Button variant="ghost">
+                          Cancel
+                        </Button>
+                        <Button variant="default" className="bg-blue-400 text-white" onClick={handleSubmit}>
+                          Create new view
+                        </Button>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                  
                 </div>
 
                 <div className="flex items-center justify-between px-1 py-1.5 hover:bg-accent rounded group">

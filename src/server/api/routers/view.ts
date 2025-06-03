@@ -8,6 +8,17 @@ import {
 } from "~/server/api/trpc";
 import { Prisma } from "@prisma/client";
 
+interface ViewSort {
+  columnId: string;
+  order: "asc" | "desc";
+}
+
+interface ViewFilter {
+  columnId: string;
+  operator: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+  value?: string | number;
+}
+
 export const viewRouter = createTRPCRouter({
     createView: protectedProcedure
         .input(z.object({ name: z.string().min(1), tableId: z.string().min(1), filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
@@ -27,6 +38,23 @@ export const viewRouter = createTRPCRouter({
             }
             return view;
         }),
+    queryView: protectedProcedure
+        .input(z.object({ id: z.string().min(1)}))
+        .query(async ({ ctx, input}) => {
+            const view = await ctx.db.view.findUnique({
+                where: { id: input.id },
+                select: {
+                    id: true,
+                    name: true,
+                    filters: true,
+                    sort: true,
+                },
+            });
+            if (!view) {
+                throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
+            }
+            return view;
+        }),
     getViews: protectedProcedure
         .input(z.object({ tableId: z.string().min(1)}))
         .query(async ({ ctx, input}) => {
@@ -37,7 +65,11 @@ export const viewRouter = createTRPCRouter({
             if (!views) {
                 throw new TRPCError({ code: "NOT_FOUND", message: "No views found for this table" });
             }
-            return views;
+            return views.map(view => ({
+                ...view,
+                sort: view.sort ? (typeof view.sort === "string" ? JSON.parse(view.sort) : view.sort) as ViewSort: null,
+                filters: view.filters ? (typeof view.filters === "string" ? JSON.parse(view.filters) : view.filters) as ViewFilter : null
+            }));
         }),
     getActiveView: protectedProcedure
         .input(z.object({ tableId: z.string().min(1)}))
@@ -98,7 +130,6 @@ export const viewRouter = createTRPCRouter({
             
             const updateData = {
       // For a string field, you can either force a default if it's undefined (here using an empty string)...
-                name: name ?? "",
                 filters: filters ?? Prisma.JsonNull,
                 sort: sort ?? Prisma.JsonNull
             };

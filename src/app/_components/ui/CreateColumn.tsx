@@ -40,16 +40,16 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [error, setError] = useState(false);
-    const { mutate: createNewColumn } = api.column.createNewColumn.useMutation({
+    const { mutate: createNewColumn, isPending: isCreating } = api.column.createNewColumn.useMutation({
             onSuccess: () => {
               void utils.column.getColumns.invalidate();
               setCreateDialogOpen(false);
               setColumnName("");
-             console.log("Column createed");
+              toast.success("Column created successfully!");
             },
             onError: (error) => {
                 setError(true);
-                console.error("Error creating column:", error);
+                toast.error("Error creating column:" + error.message);
             }
         })
       const handleCreate = (tableId: string, position: number, name: string, type: string) => {
@@ -125,7 +125,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                             </div>
                             </div>
                             <DialogFooter>
-                                    <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, columnType)}>Save changes</Button>
+                                    <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, columnType)}>{isCreating ? "Saving..." : "Save changes"}</Button>
                             </DialogFooter>
                             </DialogContent>
                         </Dialog>

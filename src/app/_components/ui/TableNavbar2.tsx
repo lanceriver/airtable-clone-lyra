@@ -67,6 +67,17 @@ type NavbarProps = {
       navbarColor?: string, 
       columnMap?: Map<string,string>,
       children: React.ReactNode, 
+      sort: {
+        columnId: string;
+        order: "asc" | "desc";
+      } | null,
+      filters: {
+        columnId: string;
+        columnName?: string;
+        value?: string | number;
+        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+    } | null,
+      activeViewId?: string,
       handleSort: (columnId: string | null, order: "asc" | "desc") => void;
       handleFilters: (
       columnId: string | null,
@@ -74,9 +85,10 @@ type NavbarProps = {
       operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty",
       value?: string | number
       ) => void;
+      handleViewChange? : (viewId: string) => void;
 }
 
-export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort  }: NavbarProps ) {
+export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange  }: NavbarProps ) {
   const utils = api.useUtils();
 
   const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "">("");
@@ -385,7 +397,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
       
       <div className="flex w-full overflow-auto">
         {/* Sidebar */}
-           <TableSidebar></TableSidebar>
+           <TableSidebar tableId={tableId} filters={filters} sort={sort} activeViewId={activeViewId} handleViewChange={handleViewChange}></TableSidebar>
         {/* Main content area - left blank for user to implement */}
         <div className="flex-1 overflow-hidden">
           {children}

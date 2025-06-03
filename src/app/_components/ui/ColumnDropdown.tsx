@@ -16,11 +16,10 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "~/components/ui/dialog"
-import { Input } from "~/components/ui/input"
-import { Label } from "~/components/ui/label"
 import { useState } from "react";
 import { Plus, ChevronDown } from "lucide-react";
 import { api } from "~/trpc/react";
+import { toast } from "sonner";
 
 
 export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: string, columnName: string, tableId: string }) {
@@ -32,8 +31,10 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
         onSuccess: () => {
             void utils.column.getColumns.invalidate();
             setDeleteOpen(false);
+            toast.success("Column deleted successfully!");
         },
         onError: (error) => {
+            toast.error("Error deleting column: " + error.message);
             console.error("Error deleting column:", error);
         }
     });

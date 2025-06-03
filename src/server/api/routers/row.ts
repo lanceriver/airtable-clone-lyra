@@ -38,12 +38,123 @@ const operatorsMap = {
 
 type Operator = keyof typeof operatorsMap;
 
-function buildQuery(columnId: string, value: string | number, operator: Operator) {
-    const queryFunction = operatorsMap[operator];
-    if (!queryFunction) {
-        throw new Error("Failed to parse operator!")
+const buildSqlQuery = (
+    tableId: string,
+    filters?: { columnId: string; operator: Operator; value?: string | number }[],
+    sort?: { columnId: string; order: string },
+    cursor?: {id: string | null | undefined, value?: string | number | null},
+    count: number = 100
+) => {
+
+    const params: (string | number)[] = [tableId];
+
+    let query = `
+    SELECT r.*, (
+        SELECT jsonb_agg(
+            jsonb_build_object(
+                'id', c.id,
+                'rowId', c."rowId",
+                'columnId', c."columnId",
+                'stringValue', c."stringValue",
+                'numberValue', c."numberValue"
+            )
+        )
+        FROM "Cell" c 
+        WHERE c."rowId" = r.id
+    ) AS cells
+    FROM "Row" r
+    WHERE r."tableId" = $1
+    `;
+
+    console.log("params:", params);
+
+    if (filters?.length) {
+        filters.forEach((filter, index) => {
+            params.push(filter.columnId);
+            query += `
+            AND EXISTS (
+                SELECT 1 FROM "Cell" c${index}
+                WHERE c${index}."rowId" = r.id
+                AND c${index}."columnId" = $${params.length}
+                AND ${buildFilterQuery(index, filter, params)} 
+            )`;
+        }); 
     }
-    return queryFunction(columnId, value);
+
+    query += `
+    GROUP BY r.id
+    `;
+
+    if (sort) {
+        params.push(sort.columnId);
+        const sortIndex = params.length;
+        if (cursor && cursor.value !== undefined && cursor.value !== null) {
+            params.push(cursor.value);
+            query += `
+            HAVING (
+                SELECT c."stringValue"
+                FROM "Cell" c
+                WHERE c."rowId" = r.id
+                AND c."columnId" = $${sortIndex}
+            ) ${sort.order === "asc" ? ">" : "<"} $${params.length}
+            ORDER BY (
+                SELECT c."stringValue" 
+                FROM "Cell" c
+                WHERE c."rowId" = r.id
+                AND c."columnId" = $${sortIndex}
+            )
+            ${sort.order === "asc" ? "ASC" : "DESC"},
+            r.id ASC`;
+        }
+        else {
+            query += `
+            ORDER BY (
+                SELECT c."stringValue" 
+                FROM "Cell" c
+                WHERE c."rowId" = r.id
+                AND c."columnId" = $${sortIndex}
+            )
+            ${sort.order === "asc" ? "ASC" : "DESC"},
+            r.id ASC`;
+        }
+    }
+    else if (cursor && cursor.id !== undefined && cursor.id !== null) {
+        params.push(cursor.id);
+        query += `AND r.id > $${params.length}  ORDER BY r.id ASC`;
+    }
+
+    params.push(count + 1);
+    query += `
+    LIMIT $${params.length}
+    `;
+
+    return { query, params };
+};
+//  Builds an SQL query based on provided filters.
+const buildFilterQuery = (
+    index: number, 
+    filters: { operator: Operator; value?: string | number },
+    params: ( string | number )[]
+) => {
+
+    switch (filters.operator) {
+        case "contains":
+            params.push(`%${filters.value}%`);
+            return `c${index}."stringValue" ILIKE $${params.length}`;
+        case "does not contain":
+            params.push(`%${filters.value}%`);
+            return `c${index}."stringValue" NOT ILIKE $${params.length}`;
+        case "is":
+            params.push(`%${filters.value}%`);
+            return `c${index}."stringValue" ILIKE $${params.length}`;
+        case "is not":
+            params.push(`%${filters.value}%`);
+            return `c${index}."stringValue" NOT ILIKE $${params.length}`;
+        case "empty":
+            return `c${index}."stringValue" IS NULL`;
+        case "is not empty":
+            return `c${index}."stringValue" IS NOT NULL`;
+    }
 }
 
 
@@ -112,7 +223,7 @@ export const rowRouter = createTRPCRouter({
     }),
     // Construct table data from rows and columns to send to the client, makes it easier to render the table. Also takes filter and sort if specified by frontend.
     getRows: protectedProcedure
-    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.string().nullish(), direction: z.enum(['forward', 'backward']).optional(),
+    .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.object({id: z.string().optional(), value: z.union([z.string(), z.number()]).optional()}).nullish(), direction: z.enum(['forward', 'backward']).optional(),
             sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional(), 
             filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
                 value: z.union([z.string().min(1), z.number()]).optional(),
@@ -121,6 +232,8 @@ export const rowRouter = createTRPCRouter({
     .query(async ({ ctx, input}) => {
         const { cursor, sort, filters, count, tableId } = input;
         // Dynamically construct query based on args provided (sort / filter)
+
+        console.log("Input for getRows:", input);
 
         if (!filters && !sort) {
             const rows = await ctx.db.row.findMany({
@@ -131,7 +244,7 @@ export const rowRouter = createTRPCRouter({
                 include: {
                     cells: true 
                 },
-                cursor: cursor ? {id: cursor} : undefined,
+                cursor: cursor ? {id: cursor.id} : undefined,
                 orderBy: {
                         id: 'asc',
                     },
@@ -142,7 +255,10 @@ export const rowRouter = createTRPCRouter({
             let nextCursor: typeof cursor | undefined = undefined;
             if (rows.length > input.count) {
                 const nextItem = rows.pop();
-                nextCursor = nextItem?.id;
+                nextCursor = {
+                        id: nextItem?.id,
+                }
+                nextItem?.id;
             }
             return {
                 rows,
@@ -150,7 +266,34 @@ export const rowRouter = createTRPCRouter({
             };
         }
 
-        const cellsQuery: Prisma.CellFindManyArgs = {
+        if (filters || sort) {
+            console.log(cursor);
+            console.log(count);
+            const { query, params } = buildSqlQuery(tableId, filters ? [filters] : undefined, sort, cursor, count + 1);
+            const rows = await ctx.db.$queryRawUnsafe<any[]>(query, ...params);
+            if (!rows) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
+            }
+            let nextCursor: typeof cursor | undefined = undefined;
+            if (rows.length > input.count) {
+                const nextItem = rows.pop();
+                let nextValue = nextItem?.cells.find((cell: any) => cell.columnId === sort?.columnId)?.stringValue;
+                if (nextValue === null || nextValue === undefined) {
+                    nextValue = nextItem?.cells.find((cell: any) => cell.columnId === sort?.columnId)?.numberValue;
+                }
+                nextCursor = {
+                    id: nextItem?.id,
+                    value: nextValue
+                };
+                console.log("Next item:", nextCursor);
+            }
+            return {
+                rows: rows,
+                nextCursor
+            }
+        }
+
+        /* const cellsQuery: Prisma.CellFindManyArgs = {
             take: count + 1,
             cursor: cursor ? {id: cursor} : undefined
         }
@@ -181,12 +324,14 @@ export const rowRouter = createTRPCRouter({
         if (sort) {
             cellsQuery.where = {
                 ...(cellsQuery.where ?? {}),
-                columnId: sort.columnId
+                    columnId: sort.columnId
             }
+    
             cellsQuery.orderBy = {
                     ...(sort.order === "asc" ? { stringValue: "asc" } : { stringValue: "desc" })
             }
         }
+        console.log("Cells query:", cellsQuery);
         
         const cells = await ctx.db.cell.findMany({
             ...cellsQuery
@@ -208,6 +353,7 @@ export const rowRouter = createTRPCRouter({
         if (!rows) {
             throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get rows!"})
         }
+        console.log("Rows before sorting:", rows);
         if (sort) {
             const rowMap = new Map(rows.map(row => [row.id, row]));
             rows = rowIds.map(id => rowMap.get(id)).filter(row => row !== undefined);
@@ -223,7 +369,7 @@ export const rowRouter = createTRPCRouter({
         }
         return {
             rows, nextCursor
-        };
+        }; */
         /* if (input.filters) {
             const cells = await ctx.db.cell.findMany({
                 take: input.count + 1,
