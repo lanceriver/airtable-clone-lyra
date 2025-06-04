@@ -35,7 +35,7 @@ type SidebarProps = {
     columnId: string;
     columnName?: string;
     value?: string | number;
-    operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+    operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gte" | "lte" | "gt" | "lt";
   } | null,
   sort: {
     columnId: string;

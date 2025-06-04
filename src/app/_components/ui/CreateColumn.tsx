@@ -40,9 +40,11 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [error, setError] = useState(false);
+
     const { mutate: createNewColumn, isPending: isCreating } = api.column.createNewColumn.useMutation({
             onSuccess: () => {
               void utils.column.getColumns.invalidate();
+              void utils.view.getActiveView.invalidate();
               setCreateDialogOpen(false);
               setColumnName("");
               toast.success("Column created successfully!");
@@ -51,16 +53,18 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                 setError(true);
                 toast.error("Error creating column:" + error.message);
             }
-        })
-      const handleCreate = (tableId: string, position: number, name: string, type: string) => {
+    });
+
+    const handleCreate = (tableId: string, position: number, name: string, type: string) => {
         createNewColumn({
             tableId: tableId,
             position: position,
             name: name,
             type: type
-        });
-      }
-      const { mutate: editColumn } = api.column.editColumn.useMutation({
+    });
+    }
+    
+    const { mutate: editColumn } = api.column.editColumn.useMutation({
         onSuccess: () => {
           void utils.column.getColumns.invalidate();
           setEditDialogOpen(false);

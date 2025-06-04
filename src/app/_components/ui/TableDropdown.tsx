@@ -46,11 +46,10 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCo
     return (
         <div className="flex flex-row items-center">
             <Link href={`/${baseId}/${tableId}`} className="text-xs text-gray-600 hover:text-blue-500">
-                <Button
-                    variant="ghost"
+                <button
                     className={cn(
-                    "px-4 py-2 h-10 hover:text-white rounded-none",  
-                    selectedTab === tableName ? "bg-white text-black" : "text-white hover:bg-black",
+                    "px-4 py-2 h-8 font-semibold hover:text-white rounded-none cursor-pointer transition-colors rounded-tl-sm",  
+                    selectedTab === tableName ? "bg-white text-black" : "text-white hover:bg-white/10 hover:bg-opacity-20",
                 )}
                     onClick={() => {
                         handleSelectTab?.(tableName, tableId);
@@ -58,12 +57,12 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCo
                     }
                 >
                     {tableName}
-                </Button>
+                </button>
             </Link>
             {selectedTab === tableName && (
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                    <button className="bg-white h-10 px-2 flex items-center border-blue-100">
+                    <button className="bg-white h-8 px-2 rounded-tr-sm flex items-center border-blue-100">
                             <ChevronDown className="text-gray-500 ml-1 h-4 w-4" />
                     </button>
                 </DropdownMenuTrigger>

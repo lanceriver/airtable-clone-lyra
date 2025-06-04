@@ -56,15 +56,15 @@ export function TableNavbar({baseId, initialTables, navbarColor}: {baseId: strin
     const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-[#c23d04]") : "bg-[#c23d04]";
     return (
         <div className="flex flex-col">
-            <div className={`flex items-center bg-[#c23d04] text-black font-normal py-0`}>
+            <div className={`flex items-center bg-[#c23d04] text-black font-normal h-8`}>
                 {tables?.map((table) => (             
                                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""} handleSelectTab={handleSelectTab}/>
                           ))}
                 <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-white  hover:bg-blue-700">
+              <button className="h-8 ml-2 cursor-pointer text-white">
                   <Plus className="h-4 w-4" />
-              </Button>
+              </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => setDialogOpen(true)}>

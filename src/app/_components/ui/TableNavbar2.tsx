@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useRef, useMemo } from "react"
+import React, { useState, useEffect, useRef, useMemo } from "react"
 import {
   Calendar,
   ChevronDown,
@@ -17,16 +17,15 @@ import {
   EyeOff,
   Palette,
   Filter,
-  Check,
+  X,
+  CrossIcon,
   TrashIcon
 } from "lucide-react"
-import { cn } from "~/lib/utils"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Separator } from "~/components/ui/separator"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel } from "~/components/ui/dropdown-menu"
 import TableSidebar from "./TableSidebar";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "~/components/ui/tooltip"
 import { api } from "~/trpc/react"
 import {
@@ -44,9 +43,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select"
-import { toast } from "sonner"
-import { set } from "zod"
+import { Switch } from "~/components/ui/switch"
 
+import { toast } from "sonner"
+import { type TableProps } from "./Table"
+ 
 type Table = {
     baseId: string;
     id: string;
@@ -75,26 +76,30 @@ type NavbarProps = {
         columnId: string;
         columnName?: string;
         value?: string | number;
-        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte";
     } | null,
       activeViewId?: string,
       handleSort: (columnId: string | null, order: "asc" | "desc") => void;
       handleFilters: (
       columnId: string | null,
       columnName?: string,
-      operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty",
+      operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
       value?: string | number
       ) => void;
       handleViewChange? : (viewId: string) => void;
+      columnVisibility?: Record<string, boolean>;
 }
 
-export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange  }: NavbarProps ) {
+export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility  }: NavbarProps ) {
   const utils = api.useUtils();
 
-  const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "">("");
+  const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte" | "">("");
   const [columnName, setColumnName] = useState("");
   const [value, setValue] = useState("");
-  const[isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
+  const [globalSearch, setGlobalSearch] = useState("");
+  const [isFiltered, setIsFiltered] = useState(false);
+  const [isSorted, setIsSorted] = useState(false);
 
   const handlePopoverClose = (open: boolean) => {
     if (!open && columnName && operator && value) {
@@ -104,6 +109,17 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     }
     setIsOpen(open);
   };
+
+  useEffect(() => {
+    const handleSearch = setTimeout(() => {
+      if (!globalSearch.trim()) {
+        handleFilters(null, undefined, "contains", undefined);
+        return;
+      }
+    handleFilters(null, undefined, "contains", globalSearch.trim());
+  }, 500)
+    return () => clearTimeout(handleSearch);
+  }, [globalSearch]);
 
   const handleSubmitFilters = () => {
     if (!columnName || !operator) {
@@ -120,7 +136,11 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
       operator === "is" ||
       operator === "is not" ||
       operator === "empty" ||
-      operator === "is not empty"
+      operator === "is not empty" ||
+      operator === "gt" ||
+      operator === "lt" ||
+      operator === "gte" ||
+      operator === "lte"
     ) {
       const columnId = columnMap?.get(columnName) ?? "";
       if (!columnId) {
@@ -133,13 +153,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         filterValue = undefined;
       }
       handleFilters(columnId, columnName, operator, filterValue);
-      
-      console.log("Filters submitted:", {
-        columnId,
-        columnName,
-        operator,
-        value: filterValue,
-      });
+      setIsFiltered(true);
       setIsOpen(false);
     }
   }
@@ -149,12 +163,37 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     setOperator("");
     setValue("");
     handleFilters(null);
+    setIsFiltered(false);
     setIsOpen(false);
   }
 
-  const [popoverOpen, setPopoverOpen] = useState(false);
-  const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
-        initialData: initialTables,});
+
+  const handleVisibilityChange = (columnId: string, isVisible: boolean) => {
+    if (columnVisibility) {
+      const updatedVisibility = { ...columnVisibility, [columnId]: isVisible };
+
+      const visibleColumnsArray = Object.entries(updatedVisibility)
+        .filter(([_, visible]) => visible)
+        .map(([id]) => id);
+
+      updateView({
+        id: activeViewId ?? "",
+        visibleColumns: visibleColumnsArray
+      })
+    }
+  }
+
+  const { mutate: updateView, isPending: isUpdatingView } = api.view.updateView.useMutation({
+    onSuccess: () => {
+      toast.success("View updated successfully!");
+      void utils.view.getActiveView.invalidate();
+      void utils.view.getViews.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update view: ${error.message}`);
+    }
+  });
+
   const { mutate: create100krows, isPending: is100KPending } = api.row.create100krows.useMutation({
     onSuccess: () => {
       toast.success("100k rows created successfully!");
@@ -181,18 +220,18 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         toastIdRef.current = null;
       }
   }, [is100KPending])
-
-  const handleCreateColumn = (tableId: string) => {
-    create100krows({ tableId });
-  }
   
-  const operators: Array<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty"> = [
+  const operators = [
     "contains",
     "does not contain",
     "is",
     "is not",
     "empty",
-    "is not empty"
+    "is not empty",
+    "gt",
+    "lt",
+    "gte",
+    "lte"
   ];
 
   const operatorRequiresValue = operator !== "empty" && operator !== "is not empty";
@@ -239,16 +278,37 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="sm" className="h-8 gap-1">
-          <EyeOff className="h-4 w-4" />
-          <span>Hide fields</span>
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 gap-1">
+                <EyeOff className="h-4 w-4" />
+                <span>Hide fields</span>
+              </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-64 p-4">
+            <div className="space-y-4 mb-4">
+              <h3 className="text-sm font-semibold">Hide/Show Fields</h3>
+            </div>
+            <div className="grid grid-cols-1 gap-y-4">
+              {columns?.map((column) => (
+                <div key={column.id} className="flex items-center space-x-2">
+                  <Switch id={column.id} checked={columnVisibility?.[column.id] ?? true} onCheckedChange={(checked) => {handleVisibilityChange(column.id, checked)}}>
+                  </Switch>
+                  <Label htmlFor={column.id} className="text-sm">
+                    {column.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+        
 
         <Popover open={isOpen} onOpenChange={handlePopoverClose}>
           <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-1">
+              <Button variant="ghost" size="sm" className={`h-8 gap-1 ${isFiltered ? "bg-[#eafbeb]" : ""}`}>  
                 <Filter className="h-4 w-4" />
-                <span>Filter</span>
+                {isFiltered ? <span>Filtered by {columnName}</span> : <span>Filter</span>}
               </Button>
           </PopoverTrigger>
           <PopoverContent className="grid grid-cols-1 gap-y-5 w-full max-w-[500px]">
@@ -295,21 +355,6 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
             </Button>
           </PopoverContent>
         </Popover>
-
-        
-
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
-              <LayoutGrid className="h-4 w-4" />
-              <span>Group</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Group by...</DropdownMenuItem>
-            <DropdownMenuItem>Clear grouping</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -358,40 +403,30 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         {!is100KPending && <span>Add 100k rows</span>}
         {is100KPending && <span className="animate-pulse">Adding 100k rows...</span>}
         </Button>
-        <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="px-4 py-2 h-10 rounded-none text-white hover:bg-blue-700 hover:text-white"
-              >
-                Extensions
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Extension 1</DropdownMenuItem>
-              <DropdownMenuItem>Extension 2</DropdownMenuItem>
-              <DropdownMenuItem>Extension 3</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="px-4 py-2 h-10 rounded-none text-white hover:bg-blue-700 hover:text-white"
-              >
-                Tools <ChevronDown className="ml-1 h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem>Tool 1</DropdownMenuItem>
-              <DropdownMenuItem>Tool 2</DropdownMenuItem>
-              <DropdownMenuItem>Tool 3</DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         <div className="ml-auto">
-          <Button variant="ghost" size="icon" className="h-8 w-8">
-            <Search className="h-4 w-4" />
-          </Button>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <Search className="h-4 w-4" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-80 mr-5 p-0">
+              <div>
+                <form className="border-0 flex items-center gap-2 p-2">
+                  <Input placeholder="Find in view" className="w-full h-10 border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)}/>
+                  <X className="" onClick={() => setGlobalSearch("")}/>
+                </form>
+                <button>
+                  
+                </button>
+              </div>
+              
+              <div className="p-4 text-xs text-gray-500 bg-gray-100">
+                Use advanced search options in the search extension.
+              </div>
+              
+            </PopoverContent>
+          </Popover>
         </div>
       </div>
       
@@ -400,7 +435,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
            <TableSidebar tableId={tableId} filters={filters} sort={sort} activeViewId={activeViewId} handleViewChange={handleViewChange}></TableSidebar>
         {/* Main content area - left blank for user to implement */}
         <div className="flex-1 overflow-hidden">
-          {children}
+          {React.isValidElement(children)
+            ? React.cloneElement(children as React.ReactElement<TableProps>, { globalSearch: globalSearch || null })
+            : children}
         </div>
       </div>
     </div>

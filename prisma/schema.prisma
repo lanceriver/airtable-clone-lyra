@@ -92,6 +92,7 @@ model View {
     columnIds String[] @default([])
     filters   Json? 
     sort      Json? 
+    visibleColumns String[]
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     /* colCount  Int

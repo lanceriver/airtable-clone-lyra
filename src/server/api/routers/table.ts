@@ -157,7 +157,8 @@ export const tableRouter = createTRPCRouter({
                     name: "Default View",
                     tableId: table.id,
                     filters: undefined,
-                    sort: undefined // No filters by default
+                    sort: undefined, 
+                    visibleColumns: columnIds, 
                 }
             })
             if (!view) {

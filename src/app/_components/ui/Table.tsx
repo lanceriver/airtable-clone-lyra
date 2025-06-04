@@ -29,7 +29,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { sseHeaders } from "@trpc/server/unstable-core-do-not-import";
 
 
-type TableProps = {
+export type TableProps = {
   rows: RowData[];
   // eslint-disable-next-line  @typescript-eslint/no-explicit-any
   columns: ColumnDef<RowData, any>[];
@@ -41,7 +41,9 @@ type TableProps = {
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
   filters?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | null;
-  
+  globalSearch?: string | null;
+  // eslint-disable-next-line  @typescript-eslint/no-empty-object-type
+  visibleColumns?: {};
 };
 
 type TableCellProps = {
@@ -117,7 +119,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
 
 
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filterColumnId}: TableProps) {
+export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filterColumnId, globalSearch, visibleColumns}: TableProps) {
   const [ data, setData] = useState(() => [...propRows]);
   const [ page, setPage] = useState(0);
   const [dropdownCell, setDropdownCell] = useState<{
@@ -128,12 +130,18 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
   const utils = api.useUtils();
 
-
+  const shouldHighlight = (cellValue: string | number | null) => {
+    if (!globalSearch || !cellValue) return false;
+    return cellValue.toString().toLowerCase().includes(globalSearch.toLowerCase());
+  };
   
 
   const table = useReactTable({
     data: propRows,
     columns: columns,
+    state: {
+      columnVisibility: visibleColumns ?? {},
+    },
     columnResizeMode: "onChange",
     getRowId: originalRow => originalRow.id,
     getCoreRowModel: getCoreRowModel(),
@@ -187,7 +195,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
     createRow({ tableId: tableId, position: fnPosition, direction: direction});
   }
 
-  const { mutate: createRow } = api.row.createRow.useMutation({
+  const { mutate: createRow, isPending: pendingCreateRow } = api.row.createRow.useMutation({
     onSuccess: () => {
       void utils.row.getRows.invalidate();
       void utils.row.sortRows.invalidate();
@@ -236,7 +244,6 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
     }
   }, [fetchNextPage, rows.length, hasNextPage, virtualItems]);
 
-  console.log("columns length: ", columns.length);
   function handleSortClick(columnId: string, order: "asc" | "desc"): void {
     handleSort(columnId, order);
     void utils.row.getRows.invalidate();
@@ -262,7 +269,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                         <span className="text-blue-500">
                           {sort.order === "asc" ? "↑" : "↓"}
                         </span>
-              )}
+                      )}
                       {header.index !== 0 && (
                         <ColumnDropdown
                           columnId={header.column.id}
@@ -328,13 +335,15 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                 {row.getVisibleCells().map((cell, colIdx) => (
                   <ContextMenu key={colIdx}>
                     <ContextMenuTrigger asChild>
-                      <td key={cell.id} className={`border flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 
+                      <td key={cell.id} className={`border border-r-0 flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 last:border-r
+                            ${idx === arr.length  - 1 ? '' : 'border-b-0'}
+                            ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-yellow-100' : ''}
                             ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
                             ${filterColumnId === cell.column.id ? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 
-                            ? <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>
+                            ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>)
                             : flexRender(cell.column.columnDef.cell, cell.getContext()))
                           : flexRender(cell.column.columnDef.cell, cell.getContext())
                         }

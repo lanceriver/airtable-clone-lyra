@@ -25,12 +25,17 @@ export const viewRouter = createTRPCRouter({
                 value: z.union([z.string().min(1), z.number()]).optional(),
             }).optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }).optional() }))
         .mutation(async ({ ctx, input}) => {
+            const columns = await ctx.db.column.findMany({
+                where: { tableId: input.tableId },
+                select: { id: true }
+            });
             const view = await ctx.db.view.create({
                 data: {
                     name: input.name,
                     tableId: input.tableId,
                     filters: input.filters ?? undefined,
                     sort: input.sort ?? undefined,
+                    visibleColumns: columns.map(column => column.id)
                 }
             })
             if (!view) {
@@ -84,6 +89,7 @@ export const viewRouter = createTRPCRouter({
                             name: true,
                             filters: true,
                             sort: true,
+                            visibleColumns: true,
                         }
                     }
                 }
@@ -111,22 +117,23 @@ export const viewRouter = createTRPCRouter({
         }),
     updateView: protectedProcedure
         .input(z.object({ 
-            id: z.string().min(1), 
+            id: z.string().min(1).optional(), 
             name: z.string().min(1).optional(), 
             filters: z.union([
                 z.object({
-                    columnId: z.string().min(1), 
-                    operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']),
+                    columnId: z.string().optional(), 
+                    operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty', 'gt', 'lt', 'gte', 'lte']).optional(),
                     value: z.union([z.string().min(1), z.number()]).optional(),
                 }), 
                 z.null()
             ]).optional(), 
-            sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }), z.null()]).optional()
+            sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }), z.null()]).optional(),
+            visibleColumns: z.array(z.string().min(1)).optional()
         }))
         .mutation(async ({ ctx, input}) => {
             console.log("Updating view with input:", input);
 
-            const { name, filters, sort } = input;
+            const { name, filters, sort, visibleColumns } = input;
             
             /* const updateData = {
                 name: name ?? undefined, 
@@ -152,6 +159,10 @@ export const viewRouter = createTRPCRouter({
         
             if ('sort' in input && input.sort !== undefined) {
                 updateData.sort = input.sort ?? Prisma.JsonNull;
+            }
+
+            if ('visibleColumns' in input && input.visibleColumns !== undefined || input.visibleColumns !== null) {
+                updateData.visibleColumns = input.visibleColumns;
             }
 
             const view = await ctx.db.view.update({

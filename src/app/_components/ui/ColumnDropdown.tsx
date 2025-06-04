@@ -22,11 +22,11 @@ import { api } from "~/trpc/react";
 import { toast } from "sonner";
 
 
-export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: string, columnName: string, tableId: string }) {
+export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: string, columnName: string, tableId: string}) {
     const utils = api.useUtils();
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
-    const [name, setName] = useState("")
+    const [name, setName] = useState("");
     const { mutate: deleteColumn } = api.column.deleteColumn.useMutation({
         onSuccess: () => {
             void utils.column.getColumns.invalidate();
@@ -35,7 +35,6 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
         },
         onError: (error) => {
             toast.error("Error deleting column: " + error.message);
-            console.error("Error deleting column:", error);
         }
     });
     const handleDelete = () => {
@@ -67,6 +66,9 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
                         Delete Column
+                    </DropdownMenuItem>
+                    <DropdownMenuItem>
+                        Hide Column
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>

@@ -18,10 +18,6 @@ import {
 
 import { generateFakeData, type DefaultTableData } from "./table";
 
-import { Prisma } from '@prisma/client';
-import build from "next/dist/build";
-import { table } from "console";
-
 const operatorsMap = {
   "contains": (columnId: string, value: string | number) => ({
     "stringValue": { contains: String(value) }
@@ -43,14 +39,27 @@ const operatorsMap = {
     NOT: { "stringValue": null,
         "numberValue": null
      }
+  }),
+  "gt": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { gt: value }
+  }),
+  "lt": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { lt: value }
+  }),
+  "gte": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { gte: value }
+  }),
+  "lte": (columnId: string, value: string | number) => ({
+    [typeof value === "string" ? "stringValue" : "numberValue"]: { lte: value }
   })
+
 };
 
 type Operator = keyof typeof operatorsMap;
 
 const buildSqlQuery = (
     tableId: string,
-    filters?: { columnId: string; operator: Operator; value?: string | number }[],
+    filters?: { columnId?: string; operator: Operator; value?: string | number }[],
     sort?: { columnId: string; order: string },
     cursor?: {id?: string | null | undefined, value?: string | number | null},
     count: number = 100
@@ -80,20 +89,30 @@ const buildSqlQuery = (
 
     if (filters?.length) {
         filters.forEach((filter, index) => {
-            params.push(filter.columnId);
-            query += `
-            AND EXISTS (
-                SELECT 1 FROM "Cell" c${index}
-                WHERE c${index}."rowId" = r.id
-                AND c${index}."columnId" = $${params.length}
-                AND ${buildFilterQuery(index, filter, params)} 
-            )`;
+            if (!filter.columnId) {
+                query += `
+                AND EXISTS (
+                    SELECT 1 FROM "Cell" c${index}
+                    WHERE c${index}."rowId" = r.id
+                    AND ${buildFilterQuery(index, filter, params)}
+                    )`;
+            }
+            else {
+                params.push(filter.columnId);
+                query += `
+                AND EXISTS (
+                    SELECT 1 FROM "Cell" c${index}
+                    WHERE c${index}."rowId" = r.id
+                    AND c${index}."columnId" = $${params.length}
+                    AND ${buildFilterQuery(index, filter, params)} 
+                )`;
+            }
+            
         }); 
     }
 
-    else if (cursor && cursor.id !== undefined && cursor.id !== null) {
+    if (cursor && cursor.id !== undefined && cursor.id !== null) {
         params.push(cursor.id);
-        console.log("params after cursor:", params);
         query += `AND r.id > $${params.length}`
     }
 
@@ -159,14 +178,32 @@ const buildFilterQuery = (
             return `c${index}."stringValue" NOT ILIKE $${params.length}`;
         case "is":
             params.push(`%${filters.value}%`);
-            return `c${index}."stringValue" ILIKE $${params.length}`;
+            if (typeof filters.value === "number") {
+                return `c${index}."numberValue" = $${params.length}`;
+            }
+            else if (typeof filters.value === "string") {
+                return `c${index}."stringValue" ILIKE $${params.length}`;
+            }
         case "is not":
             params.push(`%${filters.value}%`);
-            return `c${index}."stringValue" NOT ILIKE $${params.length}`;
+            if (typeof filters.value === "number") {
+                return `c${index}."numberValue" != $${params.length}`;
+            }
+            else if (typeof filters.value === "string") {
+                return `c${index}."stringValue" NOT ILIKE $${params.length}`;
+            }
         case "empty":
             return `c${index}."stringValue" IS NULL`;
         case "is not empty":
             return `c${index}."stringValue" IS NOT NULL`;
+        case "gt":
+            return `c${index}."numberValue" > $${params.length}`;
+        case "lt":
+            return `c${index}."numberValue" < $${params.length}`;
+        case "gte":
+            return `c${index}."numberValue" >= $${params.length}`;
+        case "lte":
+            return `c${index}."numberValue" <= $${params.length}`;
     }
 }
 
@@ -238,7 +275,7 @@ export const rowRouter = createTRPCRouter({
     getRows: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.object({id: z.string().optional(), value: z.union([z.string(), z.number()]).optional()}).nullish(), direction: z.enum(['forward', 'backward']).optional(),
             sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional(), 
-            filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
+            filters: z.object({columnId: z.string().optional(), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
                 value: z.union([z.string().min(1), z.number()]).optional(),
             }).optional()
     }))

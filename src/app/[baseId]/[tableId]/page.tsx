@@ -81,6 +81,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const viewFilters = activeViewData?.filters;
     const viewSort = activeViewData?.sort;
+    const visibleColumns = activeViewData?.visibleColumns ?? [];
+
+    console.log("visibleColumns:", visibleColumns);
     console.log("Active view filters:", viewFilters);
     console.log("Active view sort:", viewSort);
 
@@ -109,33 +112,46 @@ export default function BasePage(props: { params: Promise<Params> }) {
             void utils.row.getRows.invalidate();
         },
         onError: (error) => {
-            toast.error(`Failed to update view: ${error.message}`);
+            //toast.error(`Failed to update view: ${error.message}`);
         }
     });
-
-    
 
     const handleFilters = (
         columnId: string | null,
         columnName?: string,
-        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty",
-        value?: string | number
+        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
+        value?: string | number,
+        visibleColumns?: string[]
     ) => {
-        if (columnId === null) {
+        if (columnId === null && !value) {
             updateView({
                 id: activeViewData?.id ?? "",
-                filters: null
+                filters: null,
+                visibleColumns: visibleColumns ?? undefined,
             });
             return;
+        }
+        // Global search 
+        else if (columnId === null && value) {
+            updateView({
+                id: activeViewData?.id ?? "",
+                filters: {
+                    columnId: undefined,
+                    operator: "contains",
+                    value: value,
+                },
+                visibleColumns: visibleColumns ?? undefined,
+            });
         }
         updateView({
             id: activeViewData?.id ?? "",
             filters: {
-                columnId: columnId,
+                columnId: columnId ?? "",
                 operator: operator ?? "contains",
                 value: value ?? undefined,
             },
-            sort: viewSort
+            sort: viewSort,
+            visibleColumns: visibleColumns ?? undefined,
         })
     }
 
@@ -160,16 +176,15 @@ export default function BasePage(props: { params: Promise<Params> }) {
             columnNames.set(column.id, column.name);
                 return column.id;
             });
+ 
+    const columnVisibility = useMemo(() => {
+        if (!columns) return {};
+        return columns.reduce((acc, column) => ({
+            ...acc,
+            [column.id]: visibleColumns.includes(column.id)
+        }), {});
+    }, [columns, visibleColumns]);
 
-    // Ensure filters matches the expected type: no columnName, operator is required if filters is present
-    /* const formattedFilters = viewFilters?.operator
-        ? {
-            columnId: filters.columnId,
-            operator: filters.operator,
-            value: filters.value,
-        }
-        : undefined;
- */
     const { data: nextRows, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = api.row.getRows.useInfiniteQuery(
         {
             tableId: tableId,
@@ -183,7 +198,6 @@ export default function BasePage(props: { params: Promise<Params> }) {
             getNextPageParam: (lastPage) => lastPage?.nextCursor
         });
 
-    console.log(tableId);
     console.log("next rows are:", nextRows);
     
     const flattened = useMemo(
@@ -243,6 +257,7 @@ const loading = isColumnsLoading || isLoading;
                 handleViewChange={handleViewChange}
                 sort={viewSort ?? null}
                 filters={viewFilters ?? null}
+                columnVisibility={columnVisibility}
             >
                 <Table
                     rows={tableRows ?? []}
@@ -254,6 +269,7 @@ const loading = isColumnsLoading || isLoading;
                     hasNextPage={hasNextPage}
                     sort={viewSort ?? null}
                     filterColumnId={filteredColumn}
+                    visibleColumns={columnVisibility}
                 />
             </TableNavbar2>
             
