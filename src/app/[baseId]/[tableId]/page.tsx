@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-table"; 
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
+import { type ViewFilter } from "~/server/api/routers/view";
 import { TableCell } from "~/app/_components/ui/Table";
 import type { CellContext } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -66,8 +67,17 @@ export default function BasePage(props: { params: Promise<Params> }) {
         tableId: params.tableId,
     });
 
-    const viewId = searchParams.get("viewId") ?? views?.[0]?.id;
-    console.log("viewId from search params:", viewId);
+    const viewId = searchParams.get("viewId");
+    console.log("Current viewId:", viewId);
+    
+     useEffect(() => {
+        if (viewId) {
+            router.push(`/${params.baseId}/${params.tableId}?viewId=${viewId}`);
+        } else if (views && views.length > 0) {
+            // Redirect to first view if no viewId is present
+            router.push(`/${params.baseId}/${params.tableId}?viewId=${views[0]?.id}`);
+        }
+    }, [params.baseId, params.tableId, viewId, views, router]);
     
     const activeViewData = useMemo(() => 
         views?.find(view => view.id === viewId),
@@ -77,30 +87,25 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const handleViewChange = (viewId: string) => {
         router.push(`/${params.baseId}/${params.tableId}?viewId=${viewId}`);
     }
-    console.log("activeViewData:", activeViewData);
 
     const viewFilters = activeViewData?.filters;
     const viewSort = activeViewData?.sort;
     const visibleColumns = activeViewData?.visibleColumns ?? [];
 
-    console.log("visibleColumns:", visibleColumns);
-    console.log("Active view filters:", viewFilters);
-    console.log("Active view sort:", viewSort);
-
-    const filteredColumn = viewFilters?.columnId ?? null;
+    const filteredColumns = viewFilters?.map((filter) => filter.columnId) ?? [];
 
     const handleSort = (columnId: string | null, order: "asc" | "desc") => {
         if (columnId === null) {
             updateView({
-                id: activeViewData?.id ?? "",
+                id: viewId,
                 sort: null,
             });
             return;
         }
         updateView({
-            id: activeViewData?.id ?? "",
+            id: viewId,
             sort: { columnId, order},
-            filters: viewFilters
+            filters: viewFilters ?? undefined
         })
     }
 
@@ -118,38 +123,39 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const handleFilters = (
         columnId: string | null,
-        columnName?: string,
         operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
         value?: string | number,
         visibleColumns?: string[]
     ) => {
         if (columnId === null && !value) {
             updateView({
-                id: activeViewData?.id ?? "",
-                filters: null,
+                id: viewId,
+                filters: undefined,
                 visibleColumns: visibleColumns ?? undefined,
             });
             return;
         }
         // Global search 
         else if (columnId === null && value) {
+            const newFilter: ViewFilter = { 
+                columnId: undefined,
+                operator: "contains",
+                value: value,
+            };
             updateView({
-                id: activeViewData?.id ?? "",
-                filters: {
-                    columnId: undefined,
-                    operator: "contains",
-                    value: value,
-                },
+                id: viewId ?? undefined,
+                filters: viewFilters ? [...viewFilters, newFilter] : [newFilter],
                 visibleColumns: visibleColumns ?? undefined,
             });
         }
+        const newFilter: ViewFilter = {
+            columnId: columnId ?? "",
+            operator: operator ?? "contains",
+            value: value ?? undefined,
+        }
         updateView({
-            id: activeViewData?.id ?? "",
-            filters: {
-                columnId: columnId ?? "",
-                operator: operator ?? "contains",
-                value: value ?? undefined,
-            },
+            id: viewId,
+            filters: viewFilters ? [...viewFilters, newFilter] : [newFilter],
             sort: viewSort,
             visibleColumns: visibleColumns ?? undefined,
         })
@@ -169,11 +175,15 @@ export default function BasePage(props: { params: Promise<Params> }) {
     console.log("Current tableId:", tableId);
     
     const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId: id });
+
     const columnMap = new Map<string, string>();
     const columnNames = new Map<string, string>();
-    const final = columns?.map((column) => {
+    const columnTypes = new Map<string, string>();
+
+    columns?.map((column) => {
             columnMap.set(column.name, column.id);
             columnNames.set(column.id, column.name);
+            columnTypes.set(column.name, column.type);
                 return column.id;
             });
  
@@ -188,9 +198,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
     const { data: nextRows, isLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = api.row.getRows.useInfiniteQuery(
         {
             tableId: tableId,
-            count: 100,
+            count: 500,
             offset: 0,
-            ...(viewFilters ? { filters: viewFilters } : {}),
+            filters: viewFilters ? (Array.isArray(viewFilters) ? viewFilters : [viewFilters]) : undefined,
             ...(viewSort ? { sort: viewSort } : {}),
         },
         {
@@ -252,6 +262,7 @@ const loading = isColumnsLoading || isLoading;
                 tableId={tableId}
                 handleFilters={handleFilters}
                 columnMap={columnMap}
+                columnTypes={Object.fromEntries(columnTypes)}
                 handleSort={handleSort}
                 activeViewId={viewId}
                 handleViewChange={handleViewChange}
@@ -268,7 +279,7 @@ const loading = isColumnsLoading || isLoading;
                     isFetchingNextPage={isFetchingNextPage}
                     hasNextPage={hasNextPage}
                     sort={viewSort ?? null}
-                    filterColumnId={filteredColumn}
+                    filteredColumns={filteredColumns}
                     visibleColumns={columnVisibility}
                 />
             </TableNavbar2>

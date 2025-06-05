@@ -49,9 +49,7 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
             console.error("Error editing column:", error);
         }
     });
-    /* const handleEdit = ({}) => {
-        editColumn({columnId: columnId, tableId: tableId, newName: newName})
-    } */
+
     return (
         <div>
              <DropdownMenu>
@@ -92,26 +90,6 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
                     </DialogHeader>
                 </DialogContent>
             </Dialog>
-            {/* <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Delete Column
-                        </DialogTitle>
-                        <DialogDescription>
-                            Are you sure you want to delete column {columnName}?
-                        </DialogDescription>
-                        <DialogFooter>
-                            <Button variant="outline" onClick={() => setDeleteOpen(false)}>
-                                Cancel
-                            </Button>
-                            <Button variant="destructive" onClick={() => handleDelete()}>
-                                Delete
-                            </Button>
-                        </DialogFooter>
-                    </DialogHeader>
-                </DialogContent>
-            </Dialog> */}
         </div>
     )
 }

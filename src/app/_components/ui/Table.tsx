@@ -26,7 +26,7 @@ export type DefaultTableData = {
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { sseHeaders } from "@trpc/server/unstable-core-do-not-import";
+import { ZodAny } from "zod";
 
 
 export type TableProps = {
@@ -35,7 +35,7 @@ export type TableProps = {
   columns: ColumnDef<RowData, any>[];
   tableId: string;
   sort: { columnId: string; order: "asc" | "desc" } | null;
-  filterColumnId?: string | null;
+  filteredColumns?: (string | undefined)[];
   handleSort: (columnId: string | null, order: "asc" | "desc") => void;
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
@@ -51,6 +51,7 @@ type TableCellProps = {
   row: Row<RowData>;
   column: Column<RowData, unknown>;
   table: ReactTable<RowData>;
+  columnType?: string;
 };
 
 declare module '@tanstack/table-core' {
@@ -69,7 +70,7 @@ export function generateFakeData(count: number, seed: number): DefaultTableData[
   }));
 }
 
-export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
+export const TableCell = ({getValue, row, column, table, columnType}: TableCellProps) => {
     const { mutate: updateCell } = api.cell.updateCell.useMutation({
         onSuccess: () => {
             table.options.meta?.updateData(row.index, column.id, getValue());
@@ -80,10 +81,35 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
     })
     const initialValue = getValue();
     const [value, setValue] = useState(initialValue);
+    const [error, setError] = useState<string | null>(null);
+
+    const validateInput = (input: string) => {
+        if (columnType === 'number' && input !== '') {
+            if (!/^\d*\.?\d*$/.test(input)) {
+                setError('Please enter a valid number');
+                return false;
+            }
+        }
+        setError(null);
+        return true;
+    };
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const newValue = e.target.value;
+        setValue(newValue);
+        validateInput(newValue);
+    };
+
     useEffect(() => {
         setValue(initialValue);
     }, [initialValue]);
+
     const onBlur = () => {
+        if (error) {
+            setValue(initialValue);
+            setError(null);
+            return;
+        }
         table.options.meta?.updateData(row.index, column.id, value);
         if (value !== initialValue) {
             if (typeof value === "string") {
@@ -110,7 +136,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
             <input
                 className="w-full border-none bg-transparent focus:outline-none focus:bg-white"
                 value={value ?? ""}
-                onChange={e => setValue(e.target.value)}
+                onChange={handleChange}
                 onBlur={onBlur}
             />
         </form>
@@ -119,7 +145,7 @@ export const TableCell = ({getValue, row, column, table}: TableCellProps) => {
 
 
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filterColumnId, globalSearch, visibleColumns}: TableProps) {
+export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filteredColumns, globalSearch, visibleColumns}: TableProps) {
   const [ data, setData] = useState(() => [...propRows]);
   const [ page, setPage] = useState(0);
   const [dropdownCell, setDropdownCell] = useState<{
@@ -337,9 +363,9 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                     <ContextMenuTrigger asChild>
                       <td key={cell.id} className={`border border-r-0 flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 last:border-r
                             ${idx === arr.length  - 1 ? '' : 'border-b-0'}
-                            ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-yellow-100' : ''}
+                            ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-[#fcd66c]' : ''}
                             ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
-                            ${filterColumnId === cell.column.id ? 'bg-[#eafbeb]' : ''}`} 
+                            ${filteredColumns?.includes(cell.column.id) === true ? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 

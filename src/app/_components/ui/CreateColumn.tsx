@@ -45,6 +45,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
             onSuccess: () => {
               void utils.column.getColumns.invalidate();
               void utils.view.getActiveView.invalidate();
+              void utils.view.getViews.invalidate();
               setCreateDialogOpen(false);
               setColumnName("");
               toast.success("Column created successfully!");

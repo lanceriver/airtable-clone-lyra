@@ -102,6 +102,20 @@ export const columnRouter = createTRPCRouter({
             if (!cells) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create cells!"});
             }
+            const updateView = await ctx.db.view.updateMany({
+                where: {
+                    tableId: input.tableId
+                },
+                data: {
+                    visibleColumns: {
+                        push: column.id,
+                    }
+                }
+            })
+            if (!updateView) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update views!"})
+            }
+            console.log("updateView:", updateView);
             const updateCount = await ctx.db.table.update({
             where: {
                 id: input.tableId

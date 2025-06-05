@@ -13,17 +13,17 @@ interface ViewSort {
   order: "asc" | "desc";
 }
 
-interface ViewFilter {
-  columnId: string;
-  operator: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty";
+export interface ViewFilter {
+  columnId: string | undefined; // columnId can be undefined for global search
+  operator: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte";
   value?: string | number;
-}
+};
 
 export const viewRouter = createTRPCRouter({
     createView: protectedProcedure
         .input(z.object({ name: z.string().min(1), tableId: z.string().min(1), filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
                 value: z.union([z.string().min(1), z.number()]).optional(),
-            }).optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }).optional() }))
+            }).array().optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }).optional() }))
         .mutation(async ({ ctx, input}) => {
             const columns = await ctx.db.column.findMany({
                 where: { tableId: input.tableId },
@@ -70,10 +70,11 @@ export const viewRouter = createTRPCRouter({
             if (!views) {
                 throw new TRPCError({ code: "NOT_FOUND", message: "No views found for this table" });
             }
+            console.log("Fetched views:", views);
             return views.map(view => ({
                 ...view,
                 sort: view.sort ? (typeof view.sort === "string" ? JSON.parse(view.sort) : view.sort) as ViewSort: null,
-                filters: view.filters ? (typeof view.filters === "string" ? JSON.parse(view.filters) : view.filters) as ViewFilter : null
+                filters: view.filters ? (typeof view.filters === "string" ? JSON.parse(view.filters) : view.filters) as ViewFilter[] : null
             }));
         }),
     getActiveView: protectedProcedure
@@ -117,8 +118,8 @@ export const viewRouter = createTRPCRouter({
         }),
     updateView: protectedProcedure
         .input(z.object({ 
-            id: z.string().min(1).optional(), 
-            name: z.string().min(1).optional(), 
+            id: z.string().min(1).nullish(), 
+            name: z.string().min(1).optional(),
             filters: z.union([
                 z.object({
                     columnId: z.string().optional(), 
@@ -126,7 +127,7 @@ export const viewRouter = createTRPCRouter({
                     value: z.union([z.string().min(1), z.number()]).optional(),
                 }), 
                 z.null()
-            ]).optional(), 
+            ]).array().optional(), 
             sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }), z.null()]).optional(),
             visibleColumns: z.array(z.string().min(1)).optional()
         }))
@@ -156,6 +157,10 @@ export const viewRouter = createTRPCRouter({
             if ('filters' in input && input.filters !== undefined) {
                 updateData.filters = input.filters ?? Prisma.JsonNull;
             }
+
+            if (input.filters === undefined || input.filters === null) {
+                updateData.filters = [];
+            }
         
             if ('sort' in input && input.sort !== undefined) {
                 updateData.sort = input.sort ?? Prisma.JsonNull;
@@ -165,6 +170,9 @@ export const viewRouter = createTRPCRouter({
                 updateData.visibleColumns = input.visibleColumns;
             }
 
+            if (!input.id) {
+                throw new TRPCError({ code: "BAD_REQUEST", message: "View id is required" });
+            }
             const view = await ctx.db.view.update({
                 where: { id: input.id },
                 data: updateData

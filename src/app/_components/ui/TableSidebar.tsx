@@ -28,20 +28,16 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "~/components/ui/context-menu"
+import { type ViewFilter } from "~/server/api/routers/view"
 
 type SidebarProps = {
   tableId: string;
-  filters: {
-    columnId: string;
-    columnName?: string;
-    value?: string | number;
-    operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gte" | "lte" | "gt" | "lt";
-  } | null,
+  filters: ViewFilter[] | null;
   sort: {
     columnId: string;
     order: "asc" | "desc";  
   } | null,
-  activeViewId?: string;
+  activeViewId?: string | null;
   handleViewChange?: (viewId: string) => void;
 };
 

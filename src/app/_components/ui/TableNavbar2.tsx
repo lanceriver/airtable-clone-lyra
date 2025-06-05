@@ -44,7 +44,7 @@ import {
   SelectValue,
 } from "~/components/ui/select"
 import { Switch } from "~/components/ui/switch"
-
+import { type ViewFilter } from "~/server/api/routers/view"
 import { toast } from "sonner"
 import { type TableProps } from "./Table"
  
@@ -67,22 +67,17 @@ type NavbarProps = {
       tableId: string, 
       navbarColor?: string, 
       columnMap?: Map<string,string>,
+      columnTypes?: Record<string, string>,
       children: React.ReactNode, 
       sort: {
         columnId: string;
         order: "asc" | "desc";
       } | null,
-      filters: {
-        columnId: string;
-        columnName?: string;
-        value?: string | number;
-        operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte";
-    } | null,
-      activeViewId?: string,
+      filters: ViewFilter[] | null,
+      activeViewId?: string | null,
       handleSort: (columnId: string | null, order: "asc" | "desc") => void;
       handleFilters: (
       columnId: string | null,
-      columnName?: string,
       operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
       value?: string | number
       ) => void;
@@ -90,16 +85,34 @@ type NavbarProps = {
       columnVisibility?: Record<string, boolean>;
 }
 
-export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility  }: NavbarProps ) {
+const numberOperators: string[] = [
+  "gt",
+  "lt",
+  "gte",
+  "lte"
+];
+
+const textOperators: string[] = [
+  "contains",
+  "does not contain",
+  "is",
+  "is not",
+  "empty",
+  "is not empty"
+];
+
+export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility, columnTypes  }: NavbarProps ) {
   const utils = api.useUtils();
 
   const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte" | "">("");
   const [columnName, setColumnName] = useState("");
+  const [sortColumn, setSortColumn] = useState("");
   const [value, setValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [globalSearch, setGlobalSearch] = useState("");
+  const [globalSearch, setGlobalSearch] = useState(undefined as unknown as string);
   const [isFiltered, setIsFiltered] = useState(false);
   const [isSorted, setIsSorted] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
 
   const handlePopoverClose = (open: boolean) => {
     if (!open && columnName && operator && value) {
@@ -112,12 +125,22 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
   useEffect(() => {
     const handleSearch = setTimeout(() => {
-      if (!globalSearch.trim()) {
-        handleFilters(null, undefined, "contains", undefined);
+      if (globalSearch === undefined) {
         return;
       }
-    handleFilters(null, undefined, "contains", globalSearch.trim());
+      if (!globalSearch.trim() && isSearching) {
+        handleFilters(null, "contains", undefined);
+        return;
+      } 
+    if (!isNaN(Number(globalSearch.trim()))) {
+      handleFilters(null, "contains", Number(globalSearch.trim()));
+    }
+    else {
+      handleFilters(null, "contains", globalSearch.trim());
+    }
+    
   }, 500)
+
     return () => clearTimeout(handleSearch);
   }, [globalSearch]);
 
@@ -130,29 +153,26 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
       toast.error("Please provide a value for the selected operator.");
       return;
     }
-    if (
-      operator === "contains" ||
-      operator === "does not contain" ||
-      operator === "is" ||
-      operator === "is not" ||
-      operator === "empty" ||
-      operator === "is not empty" ||
-      operator === "gt" ||
-      operator === "lt" ||
-      operator === "gte" ||
-      operator === "lte"
-    ) {
+    if ( textOperators.includes(operator) || numberOperators.includes(operator)) {
       const columnId = columnMap?.get(columnName) ?? "";
       if (!columnId) {
-        toast.error("Invalid column selected");
-        return;
-    }
+          toast.error("Invalid column selected");
+          return;
+      }
       let filterValue: string | number | undefined = value ?? undefined;
       if (operator === "empty" || operator === "is not empty") {
         setValue("");
         filterValue = undefined;
       }
-      handleFilters(columnId, columnName, operator, filterValue);
+      if (numberOperators.includes(operator)) {
+        const numValue = Number(value);
+        if (isNaN(numValue)) {
+          toast.error("Please provide a valid number for the selected operator.");
+          return;
+        }
+        filterValue = numValue;
+      }
+      handleFilters(columnId, operator, filterValue);
       setIsFiltered(true);
       setIsOpen(false);
     }
@@ -178,6 +198,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
       updateView({
         id: activeViewId ?? "",
+        filters: filters ?? undefined,
         visibleColumns: visibleColumnsArray
       })
     }
@@ -204,7 +225,8 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     },
   });
 
-  
+  console.log("column types are:", columnTypes);
+
   const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId: tableId });
   const columnNames = columns ? columns.map((col) => col?.name) : [];
   console.log(columnNames);
@@ -233,6 +255,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     "gte",
     "lte"
   ];
+  
 
   const operatorRequiresValue = operator !== "empty" && operator !== "is not empty";
 
@@ -339,9 +362,15 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
                 <SelectContent>
                   <SelectGroup>
                     <SelectLabel>Operators</SelectLabel>
-                    {operators.map(operator => (
-                      <SelectItem key={operator} value={operator}>{operator}...</SelectItem>
-                    ))}
+                    {columnTypes && columnTypes[columnName] === "number" ? (
+                      numberOperators.map(operator => (
+                        <SelectItem key={operator} value={operator}>{operator}...</SelectItem>
+                      ))
+                    ) : (
+                      textOperators.map(operator => (
+                        <SelectItem key={operator} value={operator}>{operator}...</SelectItem>
+                      ))
+                    )}
                   </SelectGroup>
                 </SelectContent>
               </Select>
@@ -356,7 +385,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           </PopoverContent>
         </Popover>
 
-        <DropdownMenu>
+        {/* <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="sm" className="h-8 gap-1">
               <ArrowUpDown className="h-4 w-4" />
@@ -367,7 +396,76 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
             <DropdownMenuItem>Sort by...</DropdownMenuItem>
             <DropdownMenuItem onClick={() => handleSort(null, "asc")}>Clear sorting</DropdownMenuItem>
           </DropdownMenuContent>
-        </DropdownMenu>
+        </DropdownMenu> */}
+
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="sm" className="h-8 gap-1">
+              <ArrowUpDown className="h-4 w-4" />
+              <span>Sort</span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-120 p-4">
+            <div className="mb-4 flex flex-row items-center justify-between">
+              <h1 className="text-sm font-semibold">Sort by</h1>
+              <h1 className="text-xs font-normal">Copy from a view</h1>
+            </div>
+           <div className="grid grid-cols-12 gap-x-4 items-center">
+              <div className="col-span-5">
+                <Select onValueChange={(value) => {
+                  setSortColumn(value);
+                }}>
+                  <SelectTrigger className="w-full rounded-none">
+                    <SelectValue className="text-sm" placeholder="Select a column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Columns</SelectLabel>
+                      {columnNames.map(column => (
+                        <SelectItem key={column} value={column}>{column}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-5">
+                <Select onValueChange={(value) => {
+                  const columnId = columnMap?.get(sortColumn) ?? null;
+                  handleSort(columnId, value as "asc" | "desc");
+                }}>
+                  <SelectTrigger className="w-full rounded-none">
+                    <SelectValue placeholder="Sort by..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectGroup>
+                      <SelectLabel>Sort Order</SelectLabel>
+                      {columnTypes && columnTypes[sortColumn] === "number" ? (
+                        <div>
+                          <SelectItem value="asc">1 - 9</SelectItem>
+                          <SelectItem value="desc">9 - 1</SelectItem>
+                        </div>
+                      ) : (
+                        <div>
+                          <SelectItem value="asc">A - Z</SelectItem>
+                          <SelectItem value="desc">Z - A</SelectItem> 
+                        </div>
+                      )}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="col-span-2 flex items-center justify-center h-10">
+                <X 
+                  className="h-5 w-5 text-gray-500 cursor-pointer hover:text-gray-700" 
+                  onClick={() => {
+                    setSortColumn("");
+                    handleSort(null, "asc");
+                  }}
+                />
+              </div>
+            </div>  
+          </PopoverContent>
+        </Popover>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>

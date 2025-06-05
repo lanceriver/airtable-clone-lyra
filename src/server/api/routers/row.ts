@@ -55,7 +55,7 @@ const operatorsMap = {
 
 };
 
-type Operator = keyof typeof operatorsMap;
+export type Operator = keyof typeof operatorsMap;
 
 const buildSqlQuery = (
     tableId: string,
@@ -168,16 +168,24 @@ const buildFilterQuery = (
     filters: { operator: Operator; value?: string | number },
     params: ( string | number )[]
 ) => {
-
+    console.log("the filters now are: and the type of value is: ", filters, typeof filters.value);
+    if (typeof filters.value === "string") {
+        params.push(`%${filters.value}%`);
+    }
+    else if (typeof filters.value === "number") {
+        params.push(filters.value);
+    }
     switch (filters.operator) {
         case "contains":
-            params.push(`%${filters.value}%`);
-            return `c${index}."stringValue" ILIKE $${params.length}`;
+            if (typeof filters.value === "number") {
+                return `CAST(c${index}."numberValue" AS TEXT) ILIKE $${params.length}`;
+            }
+            else {
+                return `c${index}."stringValue" ILIKE $${params.length}`;
+            }
         case "does not contain":
-            params.push(`%${filters.value}%`);
             return `c${index}."stringValue" NOT ILIKE $${params.length}`;
         case "is":
-            params.push(`%${filters.value}%`);
             if (typeof filters.value === "number") {
                 return `c${index}."numberValue" = $${params.length}`;
             }
@@ -185,7 +193,6 @@ const buildFilterQuery = (
                 return `c${index}."stringValue" ILIKE $${params.length}`;
             }
         case "is not":
-            params.push(`%${filters.value}%`);
             if (typeof filters.value === "number") {
                 return `c${index}."numberValue" != $${params.length}`;
             }
@@ -197,13 +204,13 @@ const buildFilterQuery = (
         case "is not empty":
             return `c${index}."stringValue" IS NOT NULL`;
         case "gt":
-            return `c${index}."numberValue" > $${params.length}`;
+            return `c${index}."numberValue" > $${params.length}::numeric`;
         case "lt":
-            return `c${index}."numberValue" < $${params.length}`;
+            return `c${index}."numberValue" < $${params.length}::numeric`;
         case "gte":
-            return `c${index}."numberValue" >= $${params.length}`;
+            return `c${index}."numberValue" >= $${params.length}::numeric`;
         case "lte":
-            return `c${index}."numberValue" <= $${params.length}`;
+            return `c${index}."numberValue" <= $${params.length}::numeric`;
     }
 }
 
@@ -275,9 +282,11 @@ export const rowRouter = createTRPCRouter({
     getRows: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.object({id: z.string().optional(), value: z.union([z.string(), z.number()]).optional()}).nullish(), direction: z.enum(['forward', 'backward']).optional(),
             sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional(), 
-            filters: z.object({columnId: z.string().optional(), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
+            filters: z.object({
+                columnId: z.string().optional(),
+                operator: z.enum([...Object.keys(operatorsMap)] as [keyof typeof operatorsMap]),
                 value: z.union([z.string().min(1), z.number()]).optional(),
-            }).optional()
+            }).array().optional()
     }))
     .query(async ({ ctx, input}) => {
         const { cursor, sort, filters, count, tableId } = input;
@@ -320,7 +329,7 @@ export const rowRouter = createTRPCRouter({
             console.log(count);
             const { query, params } = buildSqlQuery(
                 tableId,
-                filters ? [filters] : undefined,
+                filters ?? undefined,
                 sort,
                 cursor ?? undefined,
                 count + 1
