@@ -21,6 +21,17 @@ import { set } from "zod";
 import Link from "next/link";
 
 
+export const getLastVisitedTable = (baseId: string): string | null => {
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem(`lastTable-${baseId}`);
+};
+
+export const setLastVisitedTable = (baseId: string, tableId: string): void => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(`lastTable-${baseId}`, tableId);
+};
+
+
 export function BaseCard({ baseId, baseName }: { baseId: string; baseName: string}) {
     const [newName, setNewName] = useState(baseName);
     const [isEditing, setIsEditing] = useState(false);
@@ -77,6 +88,19 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
         }
         setIsOpen(open);
     }
+
+    useEffect(() => {
+        if (tables && tables.length > 0) {
+            const lastVisited = getLastVisitedTable(baseId);
+            if (lastVisited) {
+                setDefaultTable(lastVisited);
+            }
+            else {
+                setDefaultTable(tables[0]!.id);
+            }
+        }
+    }, [tables, baseId]);
+
     return (
         <div className="relative group bg-white shadow-2xs border rounded-md ml-8 mr-8 p-4 my-5 flex items-center hover:shadow-lg transition-shadow duration-200">
             {!isEditing && (

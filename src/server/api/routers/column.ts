@@ -9,7 +9,7 @@ import { db } from "~/server/db";
 
 export const columnRouter = createTRPCRouter({
     createColumn: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1), position: z.number(),
+        .input(z.object({ tableId: z.string().min(1),
             name: z.string().min(1), type: z.string().min(1)
         }))
         .mutation(async ({ctx, input}) => {
@@ -24,7 +24,6 @@ export const columnRouter = createTRPCRouter({
             }
             const column = await ctx.db.column.create({
                 data: {
-                    position: input.position,
                     name: input.name,
                     tableId: input.tableId,
                     type: input.type
@@ -48,7 +47,7 @@ export const columnRouter = createTRPCRouter({
             }
             return column;
         }),
-    createNewColumn: protectedProcedure.input(z.object({ tableId: z.string().min(1), position: z.number(),
+    createNewColumn: protectedProcedure.input(z.object({ tableId: z.string().min(1),
             name: z.string().min(1), type: z.string().min(1)
         }))
         .mutation(async ({ctx, input}) => {
@@ -63,7 +62,6 @@ export const columnRouter = createTRPCRouter({
             }
             const column = await ctx.db.column.create({
                 data: {
-                    position: input.position,
                     name: input.name,
                     tableId: input.tableId,
                     type: input.type
@@ -182,7 +180,7 @@ export const columnRouter = createTRPCRouter({
         .query(async ({ ctx, input}) => {
             const columns = await ctx.db.column.findMany({
                 where: { tableId: input.tableId},
-                orderBy: { position: "asc"}
+                orderBy: { createdAt: "asc" },
             });
             if (!columns) {
                 throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get columns!"})

@@ -62,19 +62,18 @@ export const tableRouter = createTRPCRouter({
             }) : [];
             // Create the columns in the db.
             const columnIds: string[] = [];
-            for (let i = 0; i < columns.length; i++) {
-                const column = await ctx.db.column.create({
+            for (const column of columns) {
+                const createdColumn = await ctx.db.column.create({
                     data: {
                         tableId: table.id,
-                        position: i,
-                        name: columns[i]!.heading,
-                        type: columns[i]!.type,
+                        name: column.heading,
+                        type: column.type,
                     }
                 })
-                if (!column) {
+                if (!createdColumn) {
                     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create column!"})
                 }
-                columnIds.push(column.id);
+                columnIds.push(createdColumn.id);
             }
             // Create DB rows
             for (let i = 0; i < table.rowCount; i++) {

@@ -17,10 +17,10 @@ export type UserProps = {
 
 export function UserDropdown({ userName, userImage }: UserProps  ) {
     return (
-        <div>
+        <div className="flex flex-row items-center gap-2">
             <DropdownMenu>
                     <DropdownMenuTrigger>
-                        <Avatar className="rounded-full w-10 h-10">
+                        <Avatar className="cursor-pointer rounded-full w-8 h-8">
                             <AvatarImage src={userImage} alt="Profile" />
                             <AvatarFallback>
                                 {userName.charAt(0).toUpperCase()}

@@ -26,7 +26,7 @@ export type DefaultTableData = {
 import { ColumnDropdown } from "./ColumnDropdown";
 import type { CellContext, Table as ReactTable, Row, Column } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ZodAny } from "zod";
+import { set, ZodAny } from "zod";
 
 
 export type TableProps = {
@@ -34,9 +34,9 @@ export type TableProps = {
   // eslint-disable-next-line  @typescript-eslint/no-explicit-any
   columns: ColumnDef<RowData, any>[];
   tableId: string;
-  sort: { columnId: string; order: "asc" | "desc" } | null;
+  sort: { columnId: string; order: "asc" | "desc"} | null;
   filteredColumns?: (string | undefined)[];
-  handleSort: (columnId: string | null, order: "asc" | "desc") => void;
+  handleSort: (columnId: string | null, order: "asc" | "desc", type: "string" | "number") => void;
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
@@ -57,6 +57,12 @@ type TableCellProps = {
 declare module '@tanstack/table-core' {
   interface TableMeta<TData> {
     updateData: (rowIndex: number, columnId: string, value: unknown) => void;
+  }
+}
+
+declare module '@tanstack/react-table' {
+  interface ColumnMeta<TData, TValue> {
+    type: "string" | "number"
   }
 }
 
@@ -83,21 +89,27 @@ export const TableCell = ({getValue, row, column, table, columnType}: TableCellP
     const [value, setValue] = useState(initialValue);
     const [error, setError] = useState<string | null>(null);
 
-    const validateInput = (input: string) => {
-        if (columnType === 'number' && input !== '') {
-            if (!/^\d*\.?\d*$/.test(input)) {
-                setError('Please enter a valid number');
-                return false;
-            }
-        }
-        setError(null);
-        return true;
-    };
+    const validate = (value: string) => {
+       if (column.columnDef.meta?.type === "number") {
+          const numValue = Number(value);
+          if (isNaN(numValue)) {
+            setError("Please enter a valid number");
+            return false;
+          }
+       }
+       setError(null);
+       return true;
+    }
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
-        setValue(newValue);
-        validateInput(newValue);
+        validate(newValue);
+        if (isNaN(Number(newValue))) {
+            setValue(newValue);
+        }
+        else {
+            setValue(Number(newValue));
+        }
     };
 
     useEffect(() => {
@@ -138,8 +150,12 @@ export const TableCell = ({getValue, row, column, table, columnType}: TableCellP
                 value={value ?? ""}
                 onChange={handleChange}
                 onBlur={onBlur}
+                type="text"
+                pattern={column.columnDef.meta?.type === "number" ? "[0-9]*" : ".*"}
             />
+            {error && <span className="text-red-500 text-xs">{error}</span>}
         </form>
+        
     )
 };
 
@@ -194,25 +210,6 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
 
   const { rows } = table.getRowModel();
 
-  const { mutate: createNewColumn } = api.column.createNewColumn.useMutation({
-        onSuccess: () => {
-          void utils.column.getColumns.invalidate();
-            console.log("Column createed");
-        },
-        onError: (error) => {
-            console.error("Error creating column:", error);
-        }
-    })
-
-  const handleCreateColumn = (tableId: string, position: number, name: string, type: string, operation: string) => {
-    createNewColumn({
-        tableId: tableId,
-        position: position,
-        name: name,
-        type: type
-    });
-  }
-
   const handleCreateRow = (direction?: string, position?: number) => {
     let fnPosition = rows.length;
     if (position) {
@@ -253,9 +250,9 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
 
   const rowVirtualizer = useVirtualizer({
       count: hasNextPage ? rows.length + 1 : rows.length,
-      estimateSize: () => 10,
+      estimateSize: () => 33,
       getScrollElement: () => tableRef.current,
-      overscan: 30,
+      overscan: 50,
   });
   const virtualItems = rowVirtualizer.getVirtualItems();
   
@@ -271,11 +268,11 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
   }, [fetchNextPage, rows.length, hasNextPage, virtualItems]);
 
   function handleSortClick(columnId: string, order: "asc" | "desc"): void {
-    handleSort(columnId, order);
+    handleSort(columnId, order, columns.find(col => col.id === columnId)?.meta?.type ?? "string");
     void utils.row.getRows.invalidate();
   }
   return (
-    <div className="flex flex-row overflow-auto relative" style={{height: 1000}} ref={tableRef} >
+    <div className="flex flex-row overflow-auto relative" style={{height: 1000, minHeight:400, overscrollBehavior: 'contain'}} ref={tableRef} >
       <table className="table-fixed min-w-max">
       <thead className="grid sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
@@ -285,7 +282,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
                 <th
-                  className={`border px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === header.column.id ? 'bg-blue-50' : ''}`}
+                  className={`border border-b-0 border-r-0 border-t-0 px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === header.column.id ? 'bg-blue-50' : ''}`}
                   style={header.column.id !== 'id' ? { width: `${header.column.getSize()}px`, minWidth: `${header.column.getSize()}px`, maxWidth: `${header.column.getSize()}px` } : {}}
                 >
                   {header.isPlaceholder ? null : (
@@ -364,14 +361,19 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                       <td key={cell.id} className={`border border-r-0 flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 last:border-r
                             ${idx === arr.length  - 1 ? '' : 'border-b-0'}
                             ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-[#fcd66c]' : ''}
-                            ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
+                            ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} 
+                            ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
                             ${filteredColumns?.includes(cell.column.id) === true ? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
                         {idx === arr.length - 1
                           ? (colIdx === 0 
                             ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>)
-                            : flexRender(cell.column.columnDef.cell, cell.getContext()))
-                          : flexRender(cell.column.columnDef.cell, cell.getContext())
+                            : flexRender(cell.column.columnDef.cell, {
+                              ...cell.getContext(),
+                            }))
+                          : flexRender(cell.column.columnDef.cell, {
+                            ...cell.getContext(),
+                          })
                         }
                       </td>
                     </ContextMenuTrigger>
@@ -388,7 +390,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
         )}
       </tbody>
     </table>
-    <div>
+    <div className="sticky top-0 grid">
         <CreateColumn tableId={tableId} colCount={columns.length}/>
     </div>
     </div>

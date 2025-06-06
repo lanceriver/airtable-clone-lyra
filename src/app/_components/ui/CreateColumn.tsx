@@ -32,11 +32,12 @@ import { Label } from "~/components/ui/label"
 import { Button } from "~/components/ui/button";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
+import { set } from "zod";
 
 export function CreateColumn({ tableId, colCount } : { tableId: string, colCount: number}) {
     const utils = api.useUtils();
     const [columnName, setColumnName] = useState("");
-    const [columnType, setColumnType] = useState("string"); 
+    const [columnType, setColumnType] = useState(""); 
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
     const [editDialogOpen, setEditDialogOpen] = useState(false);
     const [error, setError] = useState(false);
@@ -48,10 +49,12 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
               void utils.view.getViews.invalidate();
               setCreateDialogOpen(false);
               setColumnName("");
+              setColumnType("");
               toast.success("Column created successfully!");
             },
             onError: (error) => {
                 setError(true);
+                setColumnType("");
                 toast.error("Error creating column:" + error.message);
             }
     });
@@ -59,7 +62,6 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
     const handleCreate = (tableId: string, position: number, name: string, type: string) => {
         createNewColumn({
             tableId: tableId,
-            position: position,
             name: name,
             type: type
     });
@@ -86,8 +88,8 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
         <>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="rounded-none bg-gray-100">
-                    <Plus className="mr-2 h-4 w-4 justify-center" />
+                <Button variant="outline" className="cursor-pointer h-[33px] border-t-0 border-b-1 rounded-none bg-gray-100">
+                    <Plus className=" h-4 w-4 justify-center" />
                 </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-56">
@@ -115,13 +117,13 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                             <Label htmlFor="type" className="text-right">
                                 Column Type
                             </Label>
-                            <Select>
+                            <Select onValueChange={(value) => setColumnType(value)}>
                               <SelectTrigger className="col-span-3 w-full">
                                 <SelectValue placeholder="Select a column type"/>
                               </SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="string" onClick={() => setColumnType("string")}>Text</SelectItem>
-                                <SelectItem value="number" onClick={() => setColumnType("number")}>Number</SelectItem>
+                                <SelectItem value="string">Text</SelectItem>
+                                <SelectItem value="number">Number</SelectItem>
                               </SelectContent>
                             </Select>
                             </div>

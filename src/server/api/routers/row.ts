@@ -60,7 +60,7 @@ export type Operator = keyof typeof operatorsMap;
 const buildSqlQuery = (
     tableId: string,
     filters?: { columnId?: string; operator: Operator; value?: string | number }[],
-    sort?: { columnId: string; order: string },
+    sort?: { columnId: string; order: string, type?: string },
     cursor?: {id?: string | null | undefined, value?: string | number | null},
     count: number = 100
 ) => {
@@ -89,7 +89,7 @@ const buildSqlQuery = (
 
     if (filters?.length) {
         filters.forEach((filter, index) => {
-            if (!filter.columnId) {
+            if (filter.columnId === "globalSearch") {
                 query += `
                 AND EXISTS (
                     SELECT 1 FROM "Cell" c${index}
@@ -98,14 +98,16 @@ const buildSqlQuery = (
                     )`;
             }
             else {
-                params.push(filter.columnId);
-                query += `
-                AND EXISTS (
-                    SELECT 1 FROM "Cell" c${index}
-                    WHERE c${index}."rowId" = r.id
-                    AND c${index}."columnId" = $${params.length}
-                    AND ${buildFilterQuery(index, filter, params)} 
-                )`;
+                if (filter.columnId !== undefined) {
+                    params.push(filter.columnId);
+                    query += `
+                    AND EXISTS (
+                        SELECT 1 FROM "Cell" c${index}
+                        WHERE c${index}."rowId" = r.id
+                        AND c${index}."columnId" = $${params.length}
+                        AND ${buildFilterQuery(index, filter, params)} 
+                    )`;
+                }
             }
             
         }); 
@@ -125,26 +127,45 @@ const buildSqlQuery = (
         const sortIndex = params.length;
         if (cursor && cursor.value !== undefined && cursor.value !== null) {
             params.push(cursor.value);
-            query += `
-            HAVING (
-                SELECT c."stringValue"
-                FROM "Cell" c
-                WHERE c."rowId" = r.id
-                AND c."columnId" = $${sortIndex}
-            ) ${sort.order === "asc" ? ">" : "<"} $${params.length}
-            ORDER BY (
-                SELECT c."stringValue" 
-                FROM "Cell" c
-                WHERE c."rowId" = r.id
-                AND c."columnId" = $${sortIndex}
-            )
-            ${sort.order === "asc" ? "ASC" : "DESC"},
-            r.id ASC`;
+            if (sort.type === "number") {
+                query += `
+                HAVING (
+                    SELECT c."numberValue"
+                    FROM "Cell" c 
+                    WHERE c."rowId" = r.id
+                    AND c."columnId" = $${sortIndex}
+                ) ${sort.order === "asc" ? ">" : "<"} $${params.length}
+                 ORDER BY (
+                    SELECT c."numberValue"
+                    FROM "Cell" c
+                    WHERE c."rowId" = r.id
+                    AND c."columnId" = $${sortIndex}
+                ) ${sort.order === "asc" ? "ASC" : "DESC"},
+                r.id ASC`;
+            }
+            else {
+                query += `
+                HAVING (
+                    SELECT c."stringValue"
+                    FROM "Cell" c
+                    WHERE c."rowId" = r.id
+                    AND c."columnId" = $${sortIndex}
+                ) ${sort.order === "asc" ? ">" : "<"} $${params.length}
+                ORDER BY (
+                    SELECT c."stringValue" 
+                    FROM "Cell" c
+                    WHERE c."rowId" = r.id
+                    AND c."columnId" = $${sortIndex}
+                )
+                ${sort.order === "asc" ? "ASC" : "DESC"},
+                r.id ASC`;
+            }
         }
         else {
+            console.log("Sort type:", sort.type);
             query += `
             ORDER BY (
-                SELECT c."stringValue" 
+                SELECT c."${sort.type === "number" ? "numberValue" : "stringValue"}"
                 FROM "Cell" c
                 WHERE c."rowId" = r.id
                 AND c."columnId" = $${sortIndex}
@@ -281,7 +302,7 @@ export const rowRouter = createTRPCRouter({
     // Construct table data from rows and columns to send to the client, makes it easier to render the table. Also takes filter and sort if specified by frontend.
     getRows: protectedProcedure
     .input(z.object({ tableId: z.string().min(1), count: z.number().min(1).max(1000), offset: z.number().min(0), cursor: z.object({id: z.string().optional(), value: z.union([z.string(), z.number()]).optional()}).nullish(), direction: z.enum(['forward', 'backward']).optional(),
-            sort: z.object({columnId: z.string().min(1), order: z.string().min(1)}).optional(), 
+            sort: z.object({columnId: z.string().min(1), order: z.string().min(1), type: z.enum(['string', 'number'])}).optional(),
             filters: z.object({
                 columnId: z.string().optional(),
                 operator: z.enum([...Object.keys(operatorsMap)] as [keyof typeof operatorsMap]),
@@ -325,8 +346,7 @@ export const rowRouter = createTRPCRouter({
         }
 
         if (filters || sort) {
-            console.log(cursor);
-            console.log(count);
+            console.log("Filters:", filters, "Sort:", sort);
             const { query, params } = buildSqlQuery(
                 tableId,
                 filters ?? undefined,

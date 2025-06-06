@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react"
 import { toast } from "sonner"
 import {
@@ -12,6 +13,7 @@ import {
   Plus,
   Search,
   Check,
+  TableCellsSplit
 } from "lucide-react"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
@@ -31,6 +33,7 @@ import {
 import { type ViewFilter } from "~/server/api/routers/view"
 
 type SidebarProps = {
+  baseId: string;
   tableId: string;
   filters: ViewFilter[] | null;
   sort: {
@@ -39,10 +42,12 @@ type SidebarProps = {
   } | null,
   activeViewId?: string | null;
   handleViewChange?: (viewId: string) => void;
+  setIsFiltered?: (isFiltering: boolean) => void;
 };
 
-export default function TableSidebar({ tableId, filters, sort, activeViewId, handleViewChange }: SidebarProps) {
-  const utils = api.useUtils()
+export default function TableSidebar({ baseId, tableId, filters, sort, activeViewId, handleViewChange, setIsFiltered}: SidebarProps) {
+  const utils = api.useUtils();
+  const router = useRouter();
 
   const [createExpanded, setCreateExpanded] = useState(true);
   const [viewName, setViewName] = useState("");
@@ -95,6 +100,7 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
   const { mutate: createView } = api.view.createView.useMutation({
     onSuccess: (newView) => {
       void utils.view.getViews.invalidate();
+      router.push(`/${baseId}/${tableId}?viewId=${newView.id}`);
       toast.success(`View "${newView.name}" created successfully!`);
     },
     onError: (error) => {
@@ -115,6 +121,8 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
   const { mutate: deleteView } = api.view.deleteView.useMutation({
     onSuccess: () => {
       void utils.view.getViews.invalidate();
+      const viewsAfterDelete = views?.filter(view => view.id !== activeViewId);
+      router.push(`/${baseId}/${tableId}?viewId=${viewsAfterDelete?.[0]?.id ?? ""}`);
       toast.success(`View deleted successfully!`);
     },
     onError: (error) => {
@@ -130,35 +138,36 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
 
   return (
     <div className="flex overflow-hidden">
-              <div className="w-64 border-r flex flex-col overflow-auto">
+          <div className="w-64 border-r flex flex-col overflow-auto">
           <div className="p-2">
             <div className="relative mb-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Find a view" className="pl-8 h-9 text-sm" />
             </div>
-
+            <div className="mb-40">
               {views?.map(view => (
-                <div key={view.id} className="w-full">
+                <div key={view.id} className="w-full gap-y-0">
                 <ContextMenu>
-                  <ContextMenuTrigger className="flex items-center w-full">
-                        <Button variant="ghost" className={`w-full justify-start gap-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100 mb-4`}
+                  <ContextMenuTrigger className="cursor-pointer flex items-center w-full">
+                        <Button variant="ghost" className={`cursor-pointer w-full justify-start gap-x-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100`}
                           onClick={() => handleViewClick(view.id)}>
-                          <Grid className="h-4 w-4 text-blue-600" />  
+                          <TableCellsSplit className="h-4 w-4 font-light text-blue-600" />  
                               {isEditing && view.id === activeViewId ? <form onSubmit={handleSubmit}>
                                   <Input value={editName || viewName} onChange={(e) => setEditName(e.target.value)}></Input>
                                 </form> : <span key={view.id} className="text-sm">{view.name}</span>}
-                          <Check className="ml-auto h-4 w-4 text-gray-600" />
+                          {view.id === activeViewId && <Check className="ml-auto h-4 w-4 text-gray-600" />}
                         </Button>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-48">
                       <ContextMenuItem onClick={() => setIsEditing(true)}>Rename view</ContextMenuItem>
-                      <ContextMenuItem onClick={() => deleteView({id: view.id})}>Delete view</ContextMenuItem>
+                      <ContextMenuItem disabled={views.length === 1}onClick={() => deleteView({id: view.id})}>Delete view</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 
                 </div>
-                
               ))}
+            </div>
+              
 
 
             {/* Create section */}
@@ -174,7 +183,7 @@ export default function TableSidebar({ tableId, filters, sort, activeViewId, han
               <CollapsibleContent className="space-y-1">
                 <div className="flex items-center justify-between px-1 py-1.5 hover:bg-accent rounded group">
                   <div className="flex items-center gap-2">
-                    <Grid className="h-4 w-4 text-blue-600" />
+                    <TableCellsSplit className="h-4 w-4 text-blue-600" />
                     <span className="text-sm">Grid</span>
                   </div>
                   <Popover>

@@ -8,10 +8,11 @@ import {
 } from "@tanstack/react-table"; 
 import { useMemo, useState, useEffect } from "react";
 import { toast } from "sonner";
-import { type ViewFilter } from "~/server/api/routers/view";
+import { type ViewFilter, type ViewSort } from "~/server/api/routers/view";
 import { TableCell } from "~/app/_components/ui/Table";
 import type { CellContext } from "@tanstack/react-table";
 import { useRouter, useSearchParams } from "next/navigation";
+import { setLastVisitedTable } from "~/app/_components/ui/BaseCard";
 
 // Dynamically generate column defs based on shape of data returned from backend, should make it more scalable
 
@@ -68,7 +69,13 @@ export default function BasePage(props: { params: Promise<Params> }) {
     });
 
     const viewId = searchParams.get("viewId");
-    console.log("Current viewId:", viewId);
+    
+    useEffect(() => {
+        if (params.baseId && params.tableId) {
+            setLastVisitedTable(params.baseId, params.tableId);
+        }
+    }, [params.baseId, params.tableId]);
+
     
      useEffect(() => {
         if (viewId) {
@@ -94,17 +101,18 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const filteredColumns = viewFilters?.map((filter) => filter.columnId) ?? [];
 
-    const handleSort = (columnId: string | null, order: "asc" | "desc") => {
+    const handleSort = (columnId: string | null, order: "asc" | "desc", type: "number" | "string") => {
         if (columnId === null) {
             updateView({
                 id: viewId,
                 sort: null,
+                filters: viewFilters ?? undefined,
             });
             return;
         }
         updateView({
             id: viewId,
-            sort: { columnId, order},
+            sort: { columnId, order, type},
             filters: viewFilters ?? undefined
         })
     }
@@ -121,24 +129,27 @@ export default function BasePage(props: { params: Promise<Params> }) {
         }
     });
 
+    const removeFilters = (columnId: string) => {
+        if (!viewFilters) return;
+        const newFilters = viewFilters.filter((filter) => filter.columnId !== columnId);
+        console.log("Removing filters for column:", columnId, "New filters:", newFilters);
+        updateView({
+            id: viewId,
+            filters: newFilters.length > 0 ? newFilters : undefined,
+            visibleColumns: visibleColumns ?? undefined,
+        })
+    }
+
     const handleFilters = (
         columnId: string | null,
         operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
         value?: string | number,
         visibleColumns?: string[]
     ) => {
-        if (columnId === null && !value) {
-            updateView({
-                id: viewId,
-                filters: undefined,
-                visibleColumns: visibleColumns ?? undefined,
-            });
-            return;
-        }
         // Global search 
-        else if (columnId === null && value) {
+        if (columnId === "globalSearch" && value) {
             const newFilter: ViewFilter = { 
-                columnId: undefined,
+                columnId: "globalSearch",
                 operator: "contains",
                 value: value,
             };
@@ -156,7 +167,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
         updateView({
             id: viewId,
             filters: viewFilters ? [...viewFilters, newFilter] : [newFilter],
-            sort: viewSort,
+            sort: viewSort?.type
+                ? { ...viewSort, type: viewSort.type }
+                : undefined,
             visibleColumns: visibleColumns ?? undefined,
         })
     }
@@ -201,7 +214,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
             count: 500,
             offset: 0,
             filters: viewFilters ? (Array.isArray(viewFilters) ? viewFilters : [viewFilters]) : undefined,
-            ...(viewSort ? { sort: viewSort } : {}),
+            ...(viewSort?.type
+                ? { sort: { ...viewSort, type: viewSort.type } }
+                : {}),
         },
         {
             initialCursor: null,
@@ -219,9 +234,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
 // Choose which data to use
  const tableRows = flattened.filter((row): row is RowData => !!row);
 const loading = isColumnsLoading || isLoading;
-/*     if (isColumnsLoading || isLoading) {
-        return <div>Loading...</div>;
-    } */
+
     const tableColumns = [];
     const idColumn = {
             id: "id",
@@ -246,6 +259,9 @@ const loading = isColumnsLoading || isLoading;
             }
             return "";
         },
+        meta: {
+            type: column.type as "string" | "number",
+        },
         cell: TableCell,
         header: () => <span>{columnNames.get(column.id)}</span>,
         size: 200,
@@ -253,6 +269,7 @@ const loading = isColumnsLoading || isLoading;
     if (returnedColumns) {
         tableColumns.push(...returnedColumns);
     }
+    console.log("Table columns:", tableColumns);
     return (
         <div className="flex flex-col overflow-auto h-full">
             <TableNavbar2
@@ -261,6 +278,7 @@ const loading = isColumnsLoading || isLoading;
                 tableCount={tableCount}
                 tableId={tableId}
                 handleFilters={handleFilters}
+                removeFilters={removeFilters}
                 columnMap={columnMap}
                 columnTypes={Object.fromEntries(columnTypes)}
                 handleSort={handleSort}

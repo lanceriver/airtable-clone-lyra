@@ -103,7 +103,7 @@ model View {
 }
 
 model Column {
-    position   Int      
+    //position   Int      
     id         String   @id @default(cuid())
     name       String
     tableId    String
@@ -114,7 +114,7 @@ model Column {
     cells      Cell[]
     views      View[]   @relation("ViewColumns")
 
-    @@unique([tableId, position])
+    //@@unique([tableId, position])
 }
 
 model Row {

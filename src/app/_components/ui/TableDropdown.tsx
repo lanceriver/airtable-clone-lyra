@@ -32,9 +32,14 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCo
     const utils = api.useUtils();
     console.log(tableCount);
     const { mutate: deleteTable } = api.table.deleteTable.useMutation({
-        onSuccess: () => {
-            void utils.table.getTables.invalidate();
+        onSuccess: async () => {
+            await utils.table.getTables.invalidate();
+            
+            const tables = await utils.table.getTables.fetch({ baseId });
+
+            handleSelectTab?.(tables[0]!.name, tables[0]!.id);
             router.push(`/${baseId}/${firstTableId}`);
+            
         },
         onError: (error) => {
             console.error("Error deleting table:", error);

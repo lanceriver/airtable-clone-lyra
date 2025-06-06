@@ -75,12 +75,13 @@ type NavbarProps = {
       } | null,
       filters: ViewFilter[] | null,
       activeViewId?: string | null,
-      handleSort: (columnId: string | null, order: "asc" | "desc") => void;
+      handleSort: (columnId: string | null, order: "asc" | "desc", type: "string" | "number") => void;
       handleFilters: (
       columnId: string | null,
       operator?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte",
       value?: string | number
       ) => void;
+      removeFilters: (columnId: string) => void;
       handleViewChange? : (viewId: string) => void;
       columnVisibility?: Record<string, boolean>;
 }
@@ -101,7 +102,7 @@ const textOperators: string[] = [
   "is not empty"
 ];
 
-export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility, columnTypes  }: NavbarProps ) {
+export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, removeFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility, columnTypes  }: NavbarProps ) {
   const utils = api.useUtils();
 
   const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte" | "">("");
@@ -123,20 +124,22 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     setIsOpen(open);
   };
 
+  console.log("filters are:", filters);
+
   useEffect(() => {
     const handleSearch = setTimeout(() => {
-      if (globalSearch === undefined) {
+      if (globalSearch === undefined || globalSearch === null || globalSearch === "") {
         return;
       }
       if (!globalSearch.trim() && isSearching) {
-        handleFilters(null, "contains", undefined);
+        handleFilters("globalSearch", "contains", undefined);
         return;
       } 
     if (!isNaN(Number(globalSearch.trim()))) {
-      handleFilters(null, "contains", Number(globalSearch.trim()));
+      handleFilters("globalSearch", "contains", Number(globalSearch.trim()));
     }
     else {
-      handleFilters(null, "contains", globalSearch.trim());
+      handleFilters("globalSearch", "contains", globalSearch.trim());
     }
     
   }, 500)
@@ -145,7 +148,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
   }, [globalSearch]);
 
   const handleSubmitFilters = () => {
-    if (!columnName || !operator) {
+    if (!columnName || !operator || value === "") {
       toast.error("Please select a column, operator, and provide a value.");
       return;
     }
@@ -178,11 +181,13 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
     }
   }
 
-  const handleClearFilters = () => {
+  console.log("columnMap is:", columnMap);
+
+  const handleClearFilters = (columnName: string) => {
+    removeFilters(columnMap?.get(columnName) ?? "");
     setColumnName("");
     setOperator("");
     setValue("");
-    handleFilters(null);
     setIsFiltered(false);
     setIsOpen(false);
   }
@@ -207,6 +212,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
   const { mutate: updateView, isPending: isUpdatingView } = api.view.updateView.useMutation({
     onSuccess: () => {
       toast.success("View updated successfully!");
+      void utils.row.getRows.invalidate();
       void utils.view.getActiveView.invalidate();
       void utils.view.getViews.invalidate();
     },
@@ -266,9 +272,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-1">
+              <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
                 <Menu className="h-4 w-4" />
-                <span>Views</span>
+                <span className="font-normal">Views</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent>Toggle view sidebar</TooltipContent>
@@ -279,9 +285,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
               <Grid className="h-4 w-4 text-blue-600" />
-              <span>Grid view</span>
+              <span className="font-normal">Grid view</span>
               <ChevronDown className="ml-1 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
@@ -303,9 +309,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
         <Popover>
           <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 gap-1">
+              <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
                 <EyeOff className="h-4 w-4" />
-                <span>Hide fields</span>
+                <span className="font-normal">Hide fields</span>
               </Button>
           </PopoverTrigger>
           <PopoverContent className="w-64 p-4">
@@ -329,9 +335,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
         <Popover open={isOpen} onOpenChange={handlePopoverClose}>
           <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className={`h-8 gap-1 ${isFiltered ? "bg-[#eafbeb]" : ""}`}>  
+              <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${(filters?.length ?? 0) > 0 ? "bg-[#eafbeb]" : ""}`}>  
                 <Filter className="h-4 w-4" />
-                {isFiltered ? <span>Filtered by {columnName}</span> : <span>Filter</span>}
+                {(filters?.length ?? 0) > 0 ? <span className="font-normal">Filtered by {columnName}</span> : <span className="font-normal">Filter</span>}
               </Button>
           </PopoverTrigger>
           <PopoverContent className="grid grid-cols-1 gap-y-5 w-full max-w-[500px]">
@@ -377,7 +383,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
               {operatorRequiresValue && (
                 <Input placeholder="Value" className="text-sm" value={value} onChange={(e) => setValue(e.target.value)}/>
               )}
-              <TrashIcon className="h-20 w-20 hover:text-red-500 cursor-pointer" onClick={() => handleClearFilters()}/>
+              <TrashIcon className="h-20 w-20 hover:text-red-500 cursor-pointer" onClick={() => handleClearFilters(columnName)}/>
             </div>
             <Button variant="ghost" size="sm" onClick={handleSubmitFilters}>
               Apply filter
@@ -385,24 +391,11 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           </PopoverContent>
         </Popover>
 
-        {/* <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
-              <ArrowUpDown className="h-4 w-4" />
-              <span>Sort</span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem>Sort by...</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleSort(null, "asc")}>Clear sorting</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu> */}
-
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
               <ArrowUpDown className="h-4 w-4" />
-              <span>Sort</span>
+              <span className="font-normal">Sort</span>
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-120 p-4">
@@ -431,7 +424,8 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
               <div className="col-span-5">
                 <Select onValueChange={(value) => {
                   const columnId = columnMap?.get(sortColumn) ?? null;
-                  handleSort(columnId, value as "asc" | "desc");
+                  const columnType = (columnTypes?.[sortColumn]) as "string" | "number";
+                  handleSort(columnId, value as "asc" | "desc", columnType);
                 }}>
                   <SelectTrigger className="w-full rounded-none">
                     <SelectValue placeholder="Sort by..." />
@@ -459,7 +453,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
                   className="h-5 w-5 text-gray-500 cursor-pointer hover:text-gray-700" 
                   onClick={() => {
                     setSortColumn("");
-                    handleSort(null, "asc");
+                    handleSort(null, "asc", "string");
                   }}
                 />
               </div>
@@ -469,9 +463,9 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 gap-1">
+            <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
               <Palette className="h-4 w-4" />
-              <span>Color</span>
+              <span className="font-normal">Color</span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
@@ -480,26 +474,22 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <Sliders className="h-4 w-4" />
-        </Button>
-
-        <Button variant="ghost" size="sm" className="h-8  gap-1">
+        <Button variant="ghost" size="sm" className="cursor-pointer h-8  gap-1">
           <Share2 className="h-4 w-4" />
-          <span>Share and sync</span>
+          <span className="font-normal">Share and sync</span>
         </Button>
 
         <Button
           variant="ghost"
           size="sm"
-          className="h-8 gap-1"
+          className="cursor-pointer h-8 gap-1"
           disabled={is100KPending}
           onClick={() => {
           create100krows({ tableId: tableId});
         }}
         >
-        {!is100KPending && <span>Add 100k rows</span>}
-        {is100KPending && <span className="animate-pulse">Adding 100k rows...</span>}
+        {!is100KPending && <span className="font-normal">Add 100k rows</span>}
+        {is100KPending && <span className="animate-pulse font-normal">Adding 100k rows...</span>}
         </Button>
         <div className="ml-auto">
           <Popover>
@@ -512,7 +502,11 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
               <div>
                 <form className="border-0 flex items-center gap-2 p-2">
                   <Input placeholder="Find in view" className="w-full h-10 border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0" value={globalSearch} onChange={(e) => setGlobalSearch(e.target.value)}/>
-                  <X className="" onClick={() => setGlobalSearch("")}/>
+                  <X className="" onClick={() => {
+                    setGlobalSearch("");
+                    removeFilters("globalSearch")
+                  }
+                    }/>
                 </form>
                 <button>
                   
@@ -530,7 +524,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
       
       <div className="flex w-full overflow-auto">
         {/* Sidebar */}
-           <TableSidebar tableId={tableId} filters={filters} sort={sort} activeViewId={activeViewId} handleViewChange={handleViewChange}></TableSidebar>
+           <TableSidebar baseId={baseId} tableId={tableId} filters={filters} sort={sort} activeViewId={activeViewId} setIsFiltered={setIsFiltered} handleViewChange={handleViewChange}></TableSidebar>
         {/* Main content area - left blank for user to implement */}
         <div className="flex-1 overflow-hidden">
           {React.isValidElement(children)

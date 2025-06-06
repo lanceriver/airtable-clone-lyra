@@ -8,9 +8,10 @@ import {
 } from "~/server/api/trpc";
 import { Prisma } from "@prisma/client";
 
-interface ViewSort {
+export interface ViewSort {
   columnId: string;
   order: "asc" | "desc";
+  type?: "string" | "number"
 }
 
 export interface ViewFilter {
@@ -23,7 +24,7 @@ export const viewRouter = createTRPCRouter({
     createView: protectedProcedure
         .input(z.object({ name: z.string().min(1), tableId: z.string().min(1), filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
                 value: z.union([z.string().min(1), z.number()]).optional(),
-            }).array().optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }).optional() }))
+            }).array().optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']), type: z.enum(['string', 'number']) }).optional() }))
         .mutation(async ({ ctx, input}) => {
             const columns = await ctx.db.column.findMany({
                 where: { tableId: input.tableId },
@@ -128,7 +129,7 @@ export const viewRouter = createTRPCRouter({
                 }), 
                 z.null()
             ]).array().optional(), 
-            sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']) }), z.null()]).optional(),
+            sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']), type: z.enum(['number', 'string']) }), z.null()]).optional(),
             visibleColumns: z.array(z.string().min(1)).optional()
         }))
         .mutation(async ({ ctx, input}) => {

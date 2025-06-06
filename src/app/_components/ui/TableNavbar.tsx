@@ -56,7 +56,7 @@ export function TableNavbar({baseId, initialTables, navbarColor}: {baseId: strin
     const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-[#c23d04]") : "bg-[#c23d04]";
     return (
         <div className="flex flex-col">
-            <div className={`flex items-center bg-[#c23d04] text-black font-normal h-8`}>
+            <div className={`flex items-center bg-[#c23d01] text-black font-normal h-8`}>
                 {tables?.map((table) => (             
                                 <TableDropdown key={table.id} baseId={baseId} tableId={table.id} tableName={table.name} selectedTab={selectedTab} tableCount={tables.length} firstTableId={tables?.[0]?.id ?? ""} handleSelectTab={handleSelectTab}/>
                           ))}
