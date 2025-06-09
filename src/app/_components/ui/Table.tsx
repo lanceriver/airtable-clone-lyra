@@ -262,7 +262,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
     if (!lastItem) {
       return;
     }
-    if (lastItem.index >= rows.length - 30 && hasNextPage && !isFetchingNextPage) {
+    if (lastItem.index >= rows.length - 50 && hasNextPage && !isFetchingNextPage) {
       fetchNextPage?.(); 
     }
   }, [fetchNextPage, rows.length, hasNextPage, virtualItems]);
@@ -271,18 +271,19 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
     handleSort(columnId, order, columns.find(col => col.id === columnId)?.meta?.type ?? "string");
     void utils.row.getRows.invalidate();
   }
+
   return (
-    <div className="flex flex-row overflow-auto relative" style={{height: 1000, minHeight:400, overscrollBehavior: 'contain'}} ref={tableRef} >
+    <div className="flex flex-row overflow-auto relative h-screen" style={{minHeight:400, overscrollBehavior: 'contain'}} ref={tableRef} >
       <table className="table-fixed min-w-max">
       <thead className="grid sticky top-0 z-10">
         {table.getHeaderGroups().map(headerGroup => (
           <tr key={headerGroup.id} className="sticky flex w-full">
-            {headerGroup.headers.map(header => (
+            {headerGroup.headers.map((header, idx) => (
               <React.Fragment key={header.id}>
                 <ContextMenu>
                   <ContextMenuTrigger asChild>
                 <th
-                  className={`border border-b-0 border-r-0 border-t-0 px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === header.column.id ? 'bg-blue-50' : ''}`}
+                  className={`border border-b border-r-0 last:border-r border-t-0 px-2 bg-gray-100 sticky top-0 z-10 ${header.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} ${sort?.columnId === header.column.id ? 'bg-blue-50' : ''}`}
                   style={header.column.id !== 'id' ? { width: `${header.column.getSize()}px`, minWidth: `${header.column.getSize()}px`, maxWidth: `${header.column.getSize()}px` } : {}}
                 >
                   {header.isPlaceholder ? null : (
@@ -339,6 +340,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
             const idx = virtualRow.index;
             const arr = rows;
             return (
+              
               <tr 
                 data-index={virtualRow.index} // dynamic row measurement
                 ref={node => { if (node) {
@@ -359,18 +361,15 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                   <ContextMenu key={colIdx}>
                     <ContextMenuTrigger asChild>
                       <td key={cell.id} className={`border border-r-0 flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 last:border-r
-                            ${idx === arr.length  - 1 ? '' : 'border-b-0'}
+                            ${idx === 0 ? 'border-t-0' : ''}
+                            ${idx === arr.length  - 1 ? 'border-l-0' : 'border-b-0'}
                             ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-[#fcd66c]' : ''}
                             ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} 
-                            ${sort?.columnId === cell.column.id ? 'bg-[#fef3ea]' : ''}
-                            ${filteredColumns?.includes(cell.column.id) === true ? 'bg-[#eafbeb]' : ''}`} 
+                            ${sort?.columnId === cell.column.id && idx !== arr.length - 1? 'bg-[#fef3ea]' : ''}
+                            ${filteredColumns?.includes(cell.column.id) === true && idx !== arr.length - 1? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
-                        {idx === arr.length - 1
-                          ? (colIdx === 0 
-                            ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>)
-                            : flexRender(cell.column.columnDef.cell, {
-                              ...cell.getContext(),
-                            }))
+                        {idx === arr.length - 1 ? (colIdx === 0 
+                            ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>) : null)
                           : flexRender(cell.column.columnDef.cell, {
                             ...cell.getContext(),
                           })
@@ -390,7 +389,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
         )}
       </tbody>
     </table>
-    <div className="sticky top-0 grid">
+    <div className="sticky top-0 grid border-l-0">
         <CreateColumn tableId={tableId} colCount={columns.length}/>
     </div>
     </div>

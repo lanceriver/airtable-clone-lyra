@@ -90,7 +90,9 @@ const numberOperators: string[] = [
   "gt",
   "lt",
   "gte",
-  "lte"
+  "lte",
+  "equals",
+  "does not equal",
 ];
 
 const textOperators: string[] = [
@@ -102,11 +104,56 @@ const textOperators: string[] = [
   "is not empty"
 ];
 
-export default function TableNavbar2({ baseId, initialTables, tableId, children, handleFilters, removeFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility, columnTypes  }: NavbarProps ) {
+export default function TableNavbar2({ baseId, tableId, children, handleFilters, removeFilters, columnMap, handleSort, filters, sort, activeViewId, handleViewChange, columnVisibility, columnTypes  }: NavbarProps ) {
   const utils = api.useUtils();
 
-  const [operator, setOperator] = useState<"contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte" | "">("");
-  const [columnName, setColumnName] = useState("");
+  const columnFilter = filters?.find((f) => f.columnId !== "globalSearch");
+
+  console.log("columnFilter is:", columnFilter);
+
+  const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId: tableId });
+
+  const prevFilter = columns?.find((column => column.id === columnFilter?.columnId));
+
+  console.log("prevFilter is:", prevFilter);
+  
+  const columnNames = columns ? columns.map((col) => col?.name) : [];
+
+  console.log(columnNames);
+
+  const [operator, setOperator] = useState(() => {
+    return columnFilter?.operator ?? "contains" as
+      | "contains"
+      | "does not contain"
+      | "is"
+      | "is not"
+      | "empty"
+      | "is not empty"
+      | "gt"
+      | "lt"
+      | "gte"
+      | "lte"
+      | "";
+  }, );
+
+  const [columnName, setColumnName] = useState(() => { 
+    return prevFilter?.name ?? ""
+  });
+
+  useEffect(() => {
+  if (prevFilter?.name) {
+    setColumnName(prevFilter.name);
+  }
+}, [prevFilter]);
+
+  useEffect(() => {
+    if (columnFilter?.operator) {
+      setOperator(columnFilter.operator);
+    }
+  }, [columnFilter]);
+
+  console.log("columnName is:", columnName);
+
   const [sortColumn, setSortColumn] = useState("");
   const [value, setValue] = useState("");
   const [isOpen, setIsOpen] = useState(false);
@@ -148,7 +195,8 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
   }, [globalSearch]);
 
   const handleSubmitFilters = () => {
-    if (!columnName || !operator || value === "") {
+    console.log("Submitting filters with columnName:", columnName, "operator:", operator, "value:", value);
+    if (!columnName || !operator || (value === "" && operator !== "empty" && operator !== "is not empty")) {
       toast.error("Please select a column, operator, and provide a value.");
       return;
     }
@@ -184,7 +232,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
   console.log("columnMap is:", columnMap);
 
   const handleClearFilters = (columnName: string) => {
-    removeFilters(columnMap?.get(columnName) ?? "");
+    removeFilters(prevFilter ? prevFilter.id : columnMap?.get(columnName) ?? "");
     setColumnName("");
     setOperator("");
     setValue("");
@@ -233,9 +281,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
   console.log("column types are:", columnTypes);
 
-  const { data: columns, isLoading: isColumnsLoading } = api.column.getColumns.useQuery({ tableId: tableId });
-  const columnNames = columns ? columns.map((col) => col?.name) : [];
-  console.log(columnNames);
+  
 
   const toastIdRef = useRef<string | number | null>(null);
 
@@ -248,20 +294,6 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
         toastIdRef.current = null;
       }
   }, [is100KPending])
-  
-  const operators = [
-    "contains",
-    "does not contain",
-    "is",
-    "is not",
-    "empty",
-    "is not empty",
-    "gt",
-    "lt",
-    "gte",
-    "lte"
-  ];
-  
 
   const operatorRequiresValue = operator !== "empty" && operator !== "is not empty";
 
@@ -337,20 +369,21 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
           <PopoverTrigger asChild>
               <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${(filters?.length ?? 0) > 0 ? "bg-[#eafbeb]" : ""}`}>  
                 <Filter className="h-4 w-4" />
-                {(filters?.length ?? 0) > 0 ? <span className="font-normal">Filtered by {columnName}</span> : <span className="font-normal">Filter</span>}
+                {(filters?.length ?? 0) > 0 ? <span className="font-normal">Filtered by {prevFilter?.name}</span> : <span className="font-normal">Filter</span>}
               </Button>
           </PopoverTrigger>
-          <PopoverContent className="grid grid-cols-1 gap-y-5 w-full max-w-[500px]">
+          <PopoverContent className="grid grid-cols-1 gap-y-5 w-150">
             <Label htmlFor="name" className="text-right">
               In this view, show records
             </Label>
             <div className="flex flex-row gap-2 items-center">
               <Label htmlFor="column">Where</Label>
-              <Select onValueChange={(value) => {
+              <div className="flex flex-row items-center">
+                <Select value={columnName} onValueChange={(value) => {
                 setColumnName(value); 
               }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select a column"/>
+                <SelectTrigger className="w-[180px] rounded-none">
+                  <SelectValue placeholder="Select a column" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectGroup>
@@ -361,8 +394,8 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
                   </SelectGroup>
                 </SelectContent>
               </Select>
-              <Select onValueChange={(value) => setOperator(value as typeof operator)}>
-                <SelectTrigger>
+              <Select value={operator} onValueChange={(value) => setOperator(value as typeof operator)}>
+                <SelectTrigger className="w-[180px] rounded-none">
                   <SelectValue placeholder="contains"/>
                 </SelectTrigger>
                 <SelectContent>
@@ -381,10 +414,15 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
                 </SelectContent>
               </Select>
               {operatorRequiresValue && (
-                <Input placeholder="Value" className="text-sm" value={value} onChange={(e) => setValue(e.target.value)}/>
+                <Input placeholder={columnFilter?.value !== undefined ? String(columnFilter?.value) : ""} className="text-sm rounded-none" value={value} onChange={(e) => setValue(e.target.value)}/>
               )}
-              <TrashIcon className="h-20 w-20 hover:text-red-500 cursor-pointer" onClick={() => handleClearFilters(columnName)}/>
+              <div className="border">
+                <TrashIcon className="h-[34px] w-[33px] hover:text-red-500 cursor-pointer" onClick={() => handleClearFilters(columnName)}/>
+              </div>
+              
             </div>
+              </div>
+              
             <Button variant="ghost" size="sm" onClick={handleSubmitFilters}>
               Apply filter
             </Button>
@@ -393,7 +431,7 @@ export default function TableNavbar2({ baseId, initialTables, tableId, children,
 
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="cursor-pointer h-8 gap-1">
+            <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${sort ? "bg-[#fef3ea]" : ""}`}>
               <ArrowUpDown className="h-4 w-4" />
               <span className="font-normal">Sort</span>
             </Button>

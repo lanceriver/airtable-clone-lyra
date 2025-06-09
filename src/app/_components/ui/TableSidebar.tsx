@@ -138,13 +138,15 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
 
   return (
     <div className="flex overflow-hidden">
-          <div className="w-64 border-r flex flex-col overflow-auto">
+        <div className="w-64 border-r flex flex-col h-screen">
           <div className="p-2">
             <div className="relative mb-2">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input placeholder="Find a view" className="pl-8 h-9 text-sm" />
             </div>
-            <div className="mb-40">
+            {/* Create section */}
+          </div>
+          <div className="flex-1 overflow-y-auto">
               {views?.map(view => (
                 <div key={view.id} className="w-full gap-y-0">
                 <ContextMenu>
@@ -167,11 +169,8 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                 </div>
               ))}
             </div>
-              
-
-
-            {/* Create section */}
-            <Collapsible open={createExpanded} onOpenChange={setCreateExpanded} className="border-t pt-4">
+        <div className="mt-2 p-2">
+                <Collapsible open={createExpanded} onOpenChange={setCreateExpanded} className="border-t pt-4">
               <CollapsibleTrigger asChild>
                 <Button variant="ghost" className="w-full justify-between px-1 py-1 h-8 mb-2">
                   <span className="text-sm font-medium">Create...</span>
@@ -316,8 +315,9 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                 </div>
               </CollapsibleContent>
             </Collapsible>
+            </div>
+            
           </div>
-        </div>
     </div>
   )
 }

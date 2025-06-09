@@ -7,6 +7,7 @@ import { HydrateClient } from "~/trpc/server";
 import { createServerSideHelpers } from '@trpc/react-query/server';
 import { appRouter } from "~/server/api/root";
 import { db } from "~/server/db";
+import { SidebarProvider } from "~/components/ui/sidebar";
 
 export default async function Home() {
   const session = await auth();
@@ -33,7 +34,8 @@ export default async function Home() {
 
   return (
     <HydrateClient>
-      <main className="text-black">
+      <SidebarProvider>
+      <main className="text-black flex-1">
         {session && 
         <div className="h-screen overflow-hidden">
           <Navbar userName={session.user?.name ?? ""} userImage={session.user?.image ?? ""}/>
@@ -43,6 +45,7 @@ export default async function Home() {
         </div>
         }
       </main>
+      </SidebarProvider>
     </HydrateClient>
   );
 }

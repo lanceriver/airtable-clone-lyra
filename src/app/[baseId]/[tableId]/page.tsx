@@ -97,6 +97,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const viewFilters = activeViewData?.filters;
     const viewSort = activeViewData?.sort;
+    
     const visibleColumns = activeViewData?.visibleColumns ?? [];
 
     const filteredColumns = viewFilters?.map((filter) => filter.columnId) ?? [];
@@ -147,6 +148,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
         visibleColumns?: string[]
     ) => {
         // Global search 
+        
         if (columnId === "globalSearch" && value) {
             const newFilter: ViewFilter = { 
                 columnId: "globalSearch",
@@ -164,9 +166,12 @@ export default function BasePage(props: { params: Promise<Params> }) {
             operator: operator ?? "contains",
             value: value ?? undefined,
         }
+        const newFilters = viewFilters?.filter((filter => filter.columnId === "globalSearch")) ?? [];
+        console.log(newFilters);
+        
         updateView({
             id: viewId,
-            filters: viewFilters ? [...viewFilters, newFilter] : [newFilter],
+            filters: viewFilters ? [...newFilters, newFilter] : [newFilter],
             sort: viewSort?.type
                 ? { ...viewSort, type: viewSort.type }
                 : undefined,

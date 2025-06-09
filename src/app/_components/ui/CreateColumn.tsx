@@ -88,7 +88,7 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
         <>
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="cursor-pointer h-[33px] border-t-0 border-b-1 rounded-none bg-gray-100">
+                <Button variant="outline" className="cursor-pointer h-[33px] border-t-0 border-b-1 border-l-0 rounded-none bg-gray-100">
                     <Plus className=" h-4 w-4 justify-center" />
                 </Button>
             </DropdownMenuTrigger>

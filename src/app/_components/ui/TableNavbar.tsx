@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Button } from "~/components/ui/button";
 import { CreateTableForm } from "./CreateTable";
 import { Plus } from "lucide-react";
+import { getLastVisitedTable, setLastVisitedTable } from "./BaseCard";
 
 type Table = {
     baseId: string;
@@ -27,33 +28,30 @@ export function TableNavbar({baseId, initialTables, navbarColor}: {baseId: strin
 
     const [dialogOpen, setDialogOpen] = useState(false);
 
+
+
     const [selectedTab, setSelectedTab] = useState(() => {
-        return localStorage.getItem("selectedTab") ?? (initialTables[0]?.name ?? "Table 1");
-      })
-    
+        const lastVisited = getLastVisitedTable(baseId);
+
+        if (lastVisited && initialTables.some(table => table.id === lastVisited)) {
+            const table = initialTables.find(t => t.id === lastVisited);
+            return table?.name ?? initialTables[0]?.name ?? "Table 1";
+        }
+        return initialTables[0]?.name ?? "Table 1";
+    });
+
       useEffect(() => {
         localStorage.setItem("selectedTab", selectedTab);
       }, [selectedTab]);
-      const [selectedTableId, setSelectedTableId] = useState(initialTables[0]?.id ?? "");
     
       const handleSelectTab = (tableName: string, tableId: string) => {
         setSelectedTab(tableName);
-        setSelectedTableId(tableId);
+        setLastVisitedTable(baseId, tableId);
       }
-      const utils = api.useUtils();
 
       const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId }, {
         initialData: initialTables,});
 
-    const darkerColorMap: Record<string, string> = {
-            "bg-blue-700": "bg-blue-900/90",
-            "bg-red-700": "bg-[#d54402]/90",
-            "bg-green-700": "bg-green-900/90",
-            "bg-orange-700": "bg-orange-900/90",
-            "bg-amber-700": "bg-amber-900/90",
-            "bg-purple-700": "bg-purple-900/90",
-    };
-    const tableNavbarColor = navbarColor ? (darkerColorMap[navbarColor] ?? "bg-[#c23d04]") : "bg-[#c23d04]";
     return (
         <div className="flex flex-col">
             <div className={`flex items-center bg-[#c23d01] text-black font-normal h-8`}>

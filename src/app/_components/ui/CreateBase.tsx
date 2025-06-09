@@ -51,8 +51,8 @@ export function CreateBaseForm() {
     return (
         <div>
             <Dialog>
-                <DialogTrigger asChild>
-                    <Button variant="outline" className="ml-8">Create new base</Button>
+                <DialogTrigger asChild className="items-center">
+                    <Button variant="default" className="justify-center cursor-pointer text-white py-2 px-22 rounded-sm bg-blue-500">Create</Button>
                 </DialogTrigger>
                 <DialogContent className="max-w">
                     <DialogHeader>

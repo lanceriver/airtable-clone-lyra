@@ -18,33 +18,6 @@ type BaseNavbarProps = {
 
 export function BaseNavbar({ baseName, baseId, children, userName, userImage }: BaseNavbarProps) {
 
-    const colorOptions = [
-        "bg-blue-700",
-        "bg-red-700",
-        "bg-green-700",
-        "bg-orange-700",
-        "bg-amber-700",
-        "bg-purple-700"
-    ];
-    const [navbarColor, setNavbarColor] = useState("bg-orange-700");
-    const didInit = useRef(false);
-
-    // Read from localStorage after mount (client only)
-    useEffect(() => {
-        if (!didInit.current) {
-            const stored = localStorage.getItem(`navbarColor-${baseId}`);
-            if (stored && colorOptions.includes(stored)) {
-                setNavbarColor(stored);
-            }
-            didInit.current = true;
-        }
-        
-    }, [baseId]);
-
-
-    useEffect(() => {
-        localStorage.setItem(`navbarColor-${baseId}`, navbarColor);
-    }, [navbarColor, baseId]);
 
     return (
         <div className="sticky top-0 z-50">
@@ -71,7 +44,6 @@ export function BaseNavbar({ baseName, baseId, children, userName, userImage }: 
                 </Link>
                 <div className="flex flex-row items-center">
                     <h1 className="text-1xl text-white font-bold">{baseName}</h1>
-                    <ColorPicker selectedColor={navbarColor} setSelectedColor={setNavbarColor} colorOptions={colorOptions} baseName={baseName}/>
                 </div>
                 <div className="flex flex-row items-center gap-x-4">
                     <button className="cursor-pointer text-xs font-medium rounded-full bg-[#B63A05] inset-shadow-sm/20 px-4 py-2 text-white ">Data</button>
