@@ -4,7 +4,7 @@ import {
   flexRender,
 } from "@tanstack/react-table";
 import type { ColumnDef } from "@tanstack/react-table";
-import { faker } from "@faker-js/faker";
+import { faker, ro } from "@faker-js/faker";
 import type { RowData } from "~/app/[baseId]/[tableId]/page";
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { api } from "~/trpc/react";
@@ -271,6 +271,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
     handleSort(columnId, order, columns.find(col => col.id === columnId)?.meta?.type ?? "string");
     void utils.row.getRows.invalidate();
   }
+  console.log(rows.length, "rows length");
 
   return (
     <div className="flex flex-row overflow-auto relative h-screen" style={{minHeight:400, overscrollBehavior: 'contain'}} ref={tableRef} >
@@ -362,17 +363,14 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                     <ContextMenuTrigger asChild>
                       <td key={cell.id} className={`border border-r-0 flex px-2 py-2 text-xs focus-within:bg-white focus-within:border-blue-400 focus-within:border-2 last:border-r
                             ${idx === 0 ? 'border-t-0' : ''}
-                            ${idx === arr.length  - 1 ? 'border-l-0' : 'border-b-0'}
+                            ${idx === arr.length - 1 ? '' : 'border-b-0'}
                             ${shouldHighlight(cell.getValue() as string | number | null) ? 'bg-[#fcd66c]' : ''}
                             ${cell.column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''} 
-                            ${sort?.columnId === cell.column.id && idx !== arr.length - 1? 'bg-[#fef3ea]' : ''}
-                            ${filteredColumns?.includes(cell.column.id) === true && idx !== arr.length - 1? 'bg-[#eafbeb]' : ''}`} 
+                            ${sort?.columnId === cell.column.id && idx !== arr.length ? 'bg-[#fef3ea]' : ''}
+                            ${filteredColumns?.includes(cell.column.id) === true && idx !== arr.length ? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
-                        {idx === arr.length - 1 ? (colIdx === 0 
-                            ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>) : null)
-                          : flexRender(cell.column.columnDef.cell, {
-                            ...cell.getContext(),
-                          })
+                        {!filteredColumns?.length && idx === rows.length - 1 ? (colIdx === 0 ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>) : flexRender(cell.column.columnDef.cell, {...cell.getContext()})) 
+                          : flexRender(cell.column.columnDef.cell, {...cell.getContext()})
                         }
                       </td>
                     </ContextMenuTrigger>

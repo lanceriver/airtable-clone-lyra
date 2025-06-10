@@ -199,7 +199,10 @@ const buildFilterQuery = (
     switch (filters.operator) {
         case "contains":
             if (typeof filters.value === "number") {
-                return `CAST(c${index}."numberValue" AS TEXT) ILIKE $${params.length}`;
+                params.pop();
+                params.push(`%${filters.value}%`);
+                return `(
+                CAST(c${index}."numberValue" AS TEXT) ILIKE $${params.length})`;
             }
             else {
                 return `c${index}."stringValue" ILIKE $${params.length}`;
@@ -232,6 +235,7 @@ const buildFilterQuery = (
             return `c${index}."numberValue" >= $${params.length}::numeric`;
         case "lte":
             return `c${index}."numberValue" <= $${params.length}::numeric`;
+        
     }
 }
 

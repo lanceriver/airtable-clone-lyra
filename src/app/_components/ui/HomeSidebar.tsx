@@ -31,10 +31,10 @@ export function HomeSidebar() {
 
     return (
         <Sidebar className="bg-white w-64 mt-16 border-r flex flex-col h-screen" side="left" collapsible="icon">
-            <SidebarContent className="flex-1 overflow-y-auto ">
+            <SidebarContent className="flex-1 overflow-y-auto min-h-0">
                 <SidebarGroup className="p-4">
                     <Collapsible open={isOpen} onOpenChange={setIsOpen} className="flex flex-col">
-                        <div className="flex flex-row justify-between items-center ">
+                        <div className="flex justify-between items-center ">
                             <h1 className="text-lg font-medium">Home</h1>
                             <CollapsibleTrigger className="flex items-center justify-between p-4">
                                 <ChevronRight className={`h-4 w-4 transition-transform ${isOpen ? "transform rotate-90" : ""}`}/>
@@ -45,11 +45,10 @@ export function HomeSidebar() {
                         </CollapsibleContent>
                     </Collapsible>
                 </SidebarGroup>
-                <SidebarFooter className="position-fixed mt-160 shrink-0 border-t p-4">
+                <SidebarFooter className="position-fixed mt-120 shrink-0 border-t p-4">
                     <CreateBaseForm />
                 </SidebarFooter>
             </SidebarContent>
-            
         </Sidebar>
     )
 }

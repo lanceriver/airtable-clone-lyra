@@ -169,17 +169,9 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                 </div>
               ))}
             </div>
-        <div className="mt-2 p-2">
-                <Collapsible open={createExpanded} onOpenChange={setCreateExpanded} className="border-t pt-4">
-              <CollapsibleTrigger asChild>
-                <Button variant="ghost" className="w-full justify-between px-1 py-1 h-8 mb-2">
-                  <span className="text-sm font-medium">Create...</span>
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform ${createExpanded ? "" : "transform rotate-180"}`}
-                  />
-                </Button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="space-y-1">
+        <div className="">
+              <Collapsible open={createExpanded} onOpenChange={setCreateExpanded} className="border-t pt-4">
+              <CollapsibleContent className="space-y-1 ml-2">
                 <div className="flex items-center justify-between px-1 py-1.5 hover:bg-accent rounded group">
                   <div className="flex items-center gap-2">
                     <TableCellsSplit className="h-4 w-4 text-blue-600" />

@@ -80,6 +80,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
      useEffect(() => {
         if (viewId) {
             router.push(`/${params.baseId}/${params.tableId}?viewId=${viewId}`);
+            setLastVisitedTable(params.baseId, params.tableId);
         } else if (views && views.length > 0) {
             // Redirect to first view if no viewId is present
             router.push(`/${params.baseId}/${params.tableId}?viewId=${views[0]?.id}`);

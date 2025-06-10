@@ -7,6 +7,8 @@ import { generateFakeData, Table } from "./Table";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { useEffect } from "react";
+import { getLastVisitedTable, setLastVisitedTable } from "./BaseCard"
+import { set } from "zod"
 
 const DEFAULT_COL_COUNT = 4;
 const DEFAULT_ROW_COUNT = 5;
@@ -36,8 +38,11 @@ export function CreateTableForm({ baseId, onSuccess, handleSelectTab }: { baseId
         
         createTable({ baseId, name: tableName, colCount, rowCount, seed }, {
             onSuccess: (createdTable) => {
+                console.log("Table created successfully:", createdTable);
                 setTableName("");
                 handleSelectTab(tableName, createdTable.id);
+                setLastVisitedTable(baseId, createdTable.id);
+                console.log("Last visited table set:", getLastVisitedTable(baseId));
                 router.push(`/${baseId}/${createdTable.id}?seed=${seed}`);
                 onSuccess?.();
             },

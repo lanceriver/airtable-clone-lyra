@@ -47,6 +47,7 @@ import { Switch } from "~/components/ui/switch"
 import { type ViewFilter } from "~/server/api/routers/view"
 import { toast } from "sonner"
 import { type TableProps } from "./Table"
+import { table } from "console"
  
 type Table = {
     baseId: string;
@@ -91,8 +92,8 @@ const numberOperators: string[] = [
   "lt",
   "gte",
   "lte",
-  "equals",
-  "does not equal",
+  "is",
+  "is not",
 ];
 
 const textOperators: string[] = [
@@ -145,6 +146,13 @@ export default function TableNavbar2({ baseId, tableId, children, handleFilters,
     setColumnName(prevFilter.name);
   }
 }, [prevFilter]);
+
+useEffect(() => {
+  return () => {
+    setGlobalSearch("");
+    removeFilters("globalSearch");
+  };
+}, [tableId, activeViewId]);
 
   useEffect(() => {
     if (columnFilter?.operator) {
@@ -367,9 +375,9 @@ export default function TableNavbar2({ baseId, tableId, children, handleFilters,
 
         <Popover open={isOpen} onOpenChange={handlePopoverClose}>
           <PopoverTrigger asChild>
-              <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${(filters?.length ?? 0) > 0 ? "bg-[#eafbeb]" : ""}`}>  
+              <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${(filters?.some(f => f.columnId !== "globalSearch")) ? "bg-[#eafbeb]" : ""}`}>  
                 <Filter className="h-4 w-4" />
-                {(filters?.length ?? 0) > 0 ? <span className="font-normal">Filtered by {prevFilter?.name}</span> : <span className="font-normal">Filter</span>}
+                {filters?.some(f => f.columnId !== "globalSearch") ? <span className="font-normal">Filtered by {prevFilter?.name}</span> : <span className="font-normal">Filter</span>}
               </Button>
           </PopoverTrigger>
           <PopoverContent className="grid grid-cols-1 gap-y-5 w-150">
