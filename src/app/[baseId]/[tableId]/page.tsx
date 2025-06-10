@@ -132,6 +132,9 @@ export default function BasePage(props: { params: Promise<Params> }) {
     });
 
     const removeFilters = (columnId: string) => {
+        if (!viewFilters?.some((column: ViewFilter) => column.columnId === columnId)) {
+            return;
+        }
         if (!viewFilters) return;
         const newFilters = viewFilters.filter((filter) => filter.columnId !== columnId);
         console.log("Removing filters for column:", columnId, "New filters:", newFilters);
