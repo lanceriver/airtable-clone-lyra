@@ -98,6 +98,8 @@ export default function BasePage(props: { params: Promise<Params> }) {
 
     const viewFilters = activeViewData?.filters;
     const viewSort = activeViewData?.sort;
+
+    console.log("Active view data:", activeViewData);
     
     const visibleColumns = activeViewData?.visibleColumns ?? [];
 
@@ -159,11 +161,13 @@ export default function BasePage(props: { params: Promise<Params> }) {
                 operator: "contains",
                 value: value,
             };
+            console.log(viewFilters);
             updateView({
                 id: viewId ?? undefined,
                 filters: viewFilters ? [...viewFilters, newFilter] : [newFilter],
                 visibleColumns: visibleColumns ?? undefined,
             });
+            return;
         }
         const newFilter: ViewFilter = {
             columnId: columnId ?? "",
