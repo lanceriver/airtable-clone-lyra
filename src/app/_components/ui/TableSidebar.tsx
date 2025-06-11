@@ -155,7 +155,7 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                           onClick={() => handleViewClick(view.id)}>
                           <TableCellsSplit className="h-4 w-4 font-light text-blue-600" />  
                               {isEditing && view.id === activeViewId ? <form onSubmit={handleSubmit}>
-                                  <Input value={editName || viewName} onChange={(e) => setEditName(e.target.value)}></Input>
+                                  <Input value={editName || viewName} onChange={(e) => setEditName(e.target.value)} onBlur={() => setIsEditing(false)}></Input>
                                 </form> : <span key={view.id} className="text-sm">{view.name}</span>}
                           {view.id === activeViewId && <Check className="ml-auto h-4 w-4 text-gray-600" />}
                         </Button>

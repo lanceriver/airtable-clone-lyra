@@ -40,6 +40,7 @@ export type TableProps = {
   fetchNextPage?: () => void;
   hasNextPage?: boolean;
   isFetchingNextPage?: boolean;
+  isLoading?: boolean;
   filters?: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | null;
   globalSearch?: string | null;
   // eslint-disable-next-line  @typescript-eslint/no-empty-object-type
@@ -161,15 +162,10 @@ export const TableCell = ({getValue, row, column, table, columnType}: TableCellP
 
 
 // eslint-disable-next-line  @typescript-eslint/no-explicit-any
-export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, sort, filteredColumns, globalSearch, visibleColumns}: TableProps) {
+export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading, sort, filteredColumns, globalSearch, visibleColumns}: TableProps) {
   const [ data, setData] = useState(() => [...propRows]);
-  const [ page, setPage] = useState(0);
-  const [dropdownCell, setDropdownCell] = useState<{
-    cellId: string;
-    rowId: string;
-    columnId: string;
-  } | null>(null);
   const [activeFilterColumn, setActiveFilterColumn] = useState<string | null>(null);
+
   const utils = api.useUtils();
 
   const shouldHighlight = (cellValue: string | number | null) => {
@@ -249,7 +245,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
   const tableRef = useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
-      count: hasNextPage ? rows.length + 1 : rows.length,
+      count: rows.length + 1,
       estimateSize: () => 33,
       getScrollElement: () => tableRef.current,
       overscan: 50,
@@ -328,7 +324,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
         ))}
       </thead>
       <tbody style={{display: 'grid', height: `${rowVirtualizer.getTotalSize()}px`, position: "relative"}} >
-        {table.getRowModel().rows.length === 0 ? (
+        {table.getRowModel().rows.length === 0 && !isLoading ? (
           <tr>
             <td colSpan={columns.length} className="text-center py-4 text-gray-400">
               No data available for this filter!
@@ -336,12 +332,49 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
           </tr>
         ) : (
           rowVirtualizer.getVirtualItems().map(virtualRow => {
+            const isLastRow = virtualRow.index === rows.length;
+
+            if (isLastRow) {
+      return (
+        <tr 
+          data-index={virtualRow.index}
+          key="add-row"
+          className="hover:bg-gray-50 relative"
+          style={{
+            display: 'flex',
+            transform: `translateY(${virtualRow.start}px)`,
+            position: 'absolute',
+            width: "100%",
+          }}
+        >
+          {table.getAllColumns().map((column, idx) => (
+            <td 
+              key={column.id}
+              className={`border border-t-0 border-r-0 border-l-0 first:border-l last:border-r flex items-center px-2 py-2 text-xs ${
+                column.id === 'id' ? 'w-[80px] min-w-[80px] max-w-[80px]' : ''
+              }`}
+              style={column.id !== 'id' ? {
+                width: `${column.getSize()}px`,
+                minWidth: `${column.getSize()}px`,
+                maxWidth: `${column.getSize()}px`
+              } : {}}
+            >
+              {idx === 0 && (
+                pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>
+              )}
+            </td>
+          ))}
+        </tr>
+      );
+    }
+
+
             const row = rows[virtualRow.index];
             if (!row) return null;
             const idx = virtualRow.index;
             const arr = rows;
+
             return (
-              
               <tr 
                 data-index={virtualRow.index} // dynamic row measurement
                 ref={node => { if (node) {
@@ -369,7 +402,7 @@ export function Table({rows: propRows, columns, tableId, handleSort, fetchNextPa
                             ${sort?.columnId === cell.column.id && idx !== arr.length ? 'bg-[#fef3ea]' : ''}
                             ${filteredColumns?.includes(cell.column.id) === true && idx !== arr.length ? 'bg-[#eafbeb]' : ''}`} 
                             style={cell.column.id !== 'id' ? {width: `${cell.column.getSize()}px`, minWidth: `${cell.column.getSize()}px`, maxWidth: `${cell.column.getSize()}px`} : {}}>
-                        {!filteredColumns?.length && idx === rows.length - 1 ? (colIdx === 0 ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>) : flexRender(cell.column.columnDef.cell, {...cell.getContext()})) 
+                        {isLastRow ? (colIdx === 0 ? (pendingCreateRow ? '...' : <Plus className="h-4 w-4" onClick={() => handleCreateRow()}/>) : flexRender(cell.column.columnDef.cell, {...cell.getContext()})) 
                           : flexRender(cell.column.columnDef.cell, {...cell.getContext()})
                         }
                       </td>

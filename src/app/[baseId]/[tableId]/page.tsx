@@ -6,7 +6,7 @@ import { api } from "~/trpc/react";
 import {
   createColumnHelper
 } from "@tanstack/react-table"; 
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { type ViewFilter, type ViewSort } from "~/server/api/routers/view";
 import { TableCell } from "~/app/_components/ui/Table";
@@ -129,7 +129,7 @@ export default function BasePage(props: { params: Promise<Params> }) {
             void utils.row.getRows.invalidate();
         },
         onError: (error) => {
-            //toast.error(`Failed to update view: ${error.message}`);
+            toast.error(`Failed to update view: ${error.message}`);
         }
     });
 
@@ -308,6 +308,7 @@ const loading = isColumnsLoading || isLoading;
                     handleSort={handleSort}
                     fetchNextPage={fetchNextPage}
                     isFetchingNextPage={isFetchingNextPage}
+                    isLoading={isLoading}
                     hasNextPage={hasNextPage}
                     sort={viewSort ?? null}
                     filteredColumns={filteredColumns}

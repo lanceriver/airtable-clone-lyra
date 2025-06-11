@@ -14,13 +14,15 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { useState } from "react"
 import { api } from "~/trpc/react"
+import { Plus } from "lucide-react"
 
 export function CreateBaseForm() {
     const { mutate: createBase } = api.base.createBase.useMutation();
+
     const { mutate: createTable } = api.table.createTable.useMutation();
+
     const [baseName, setBaseName] = useState("");
     const [tableId, setTableId] = useState("");
-    const id = "";
     const utils = api.useUtils();
 
     const handleSubmit = () => {
@@ -52,7 +54,9 @@ export function CreateBaseForm() {
         <div>
             <Dialog>
                 <DialogTrigger asChild className="items-center">
-                    <Button variant="default" className="justify-center cursor-pointer text-white py-2 px-22 rounded-sm bg-blue-500">Create</Button>
+                    <div>
+                        <Button variant="default" className="justify-center cursor-pointer text-white py-2 px-24 rounded-sm bg-blue-500 hover:bg-blue-700">Create</Button>
+                    </div>
                 </DialogTrigger>
                 <DialogContent className="max-w">
                     <DialogHeader>

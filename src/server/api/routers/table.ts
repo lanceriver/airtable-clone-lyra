@@ -207,6 +207,20 @@ export const tableRouter = createTRPCRouter({
             }
             return table;
         }),
+    updateTable: protectedProcedure
+        .input(z.object({id: z.string().min(1), name: z.string().min(1)}))
+        .mutation(async ({ ctx, input }) => {
+            const table = await ctx.db.table.update({
+                where: { id: input.id },
+                data: {
+                    name: input.name
+                }
+            });
+            if (!table) {
+                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update table!"});
+            }
+            return table;
+        }),
     deleteTable: protectedProcedure
         .input(z.object({ id: z.string().min(1)}))
         .mutation(async ({ ctx, input} ) => {

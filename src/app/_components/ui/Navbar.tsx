@@ -3,7 +3,7 @@ import { Input } from "~/components/ui/input";
 import { UserDropdown } from "./UserDropdown";
 import { CustomTrigger } from "./HomeSidebar";
 import { SidebarTrigger } from "~/components/ui/sidebar";
-import { Search, BellIcon, CircleHelp } from "lucide-react";
+import { Search, BellIcon, CircleHelp, Menu } from "lucide-react";
 
 export type UserProps = {   
     userName: string;
@@ -12,9 +12,10 @@ export type UserProps = {
 
 export function Navbar({ userName, userImage }: UserProps  ) {
     return (
-        <div className="w-full flex px-4 py-3 justify-between items-center border-b shadow-xl">
+        <div className="w-full flex px-4 py-3 justify-between items-center bg-white border-b shadow-2xl">
             <div className="flex items-center gap-x-4">
-                <img src="/assets/airtable_logo.svg" alt="AirTable Logo"/>
+                <Menu className="text-gray-400 cursor-pointer" />
+                <img width="100" src="/assets/airtable_logo.svg" alt="AirTable Logo"/>
             </div>
             <div className="items-center">
                 <form className="flex items-center relative">
