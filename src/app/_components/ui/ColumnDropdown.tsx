@@ -15,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "~/components/ui/dialog"
+} from "~/components/ui/dialog";
 import { useState } from "react";
 import { Plus, ChevronDown } from "lucide-react";
 import { api } from "~/trpc/react";
@@ -55,18 +55,12 @@ export function ColumnDropdown({ columnId, columnName, tableId}: { columnId: str
              <DropdownMenu>
                 <DropdownMenuTrigger asChild>   
                         <button className="mr-2 h-4 w-4 flex items-center justify-center cursor-pointer">
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-4 w-4 cursor-pointer" />
                         </button>    
                 </DropdownMenuTrigger>
                 <DropdownMenuContent className="w-56">
-                    <DropdownMenuItem>
-                        Rename Column
-                    </DropdownMenuItem>
                     <DropdownMenuItem onClick={() => setDeleteOpen(true)}>
                         Delete Column
-                    </DropdownMenuItem>
-                    <DropdownMenuItem>
-                        Hide Column
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
