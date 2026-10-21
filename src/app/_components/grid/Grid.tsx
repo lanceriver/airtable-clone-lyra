@@ -4,7 +4,6 @@ import {
   getCoreRowModel,
   useReactTable,
   type ColumnDef,
-  type ColumnSizingState,
   type VisibilityState,
 } from "@tanstack/react-table";
 import {
@@ -13,12 +12,12 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
-  useState,
   type MouseEvent,
 } from "react";
 
 import type { RowRecord, ViewSort } from "~/server/db/rows";
 import { GridBody } from "./GridBody";
+import { useGridColumnSizing } from "./GridColumnTools";
 import { GridHeader } from "./GridHeader";
 import {
   ADD_FIELD_WIDTH,
@@ -92,7 +91,7 @@ export function Grid({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // -- Columns (TanStack Table owns the column model) ------------------------
-  const [columnSizing, setColumnSizing] = useState<ColumnSizingState>({});
+  const { columnSizing, onColumnSizingChange } = useGridColumnSizing();
   const columnDefs = useMemo<ColumnDef<RowRecord, unknown>[]>(
     () => fields.map((field) => ({ id: field.id, header: field.name })),
     [fields],
@@ -107,7 +106,7 @@ export function Grid({
     columns: columnDefs,
     getCoreRowModel: getCoreRowModel(),
     state: { columnVisibility, columnSizing },
-    onColumnSizingChange: setColumnSizing,
+    onColumnSizingChange,
     columnResizeMode: "onChange",
     defaultColumn: { size: DEFAULT_COLUMN_WIDTH, minSize: MIN_COLUMN_WIDTH },
   });
