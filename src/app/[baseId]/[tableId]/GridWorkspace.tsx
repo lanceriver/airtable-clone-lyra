@@ -3,8 +3,14 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { Grid } from "~/app/_components/grid/Grid";
+import {
+    GridColumnToolsProvider,
+    type GridColumnTools,
+} from "~/app/_components/grid/GridColumnTools";
 import type { GridField } from "~/app/_components/grid/gridTypes";
+import { useColumnWidths } from "~/app/_components/grid/useColumnWidths";
 import { useRowPages } from "~/app/_components/grid/useRowPages";
+import type { AddFilterRequest } from "~/app/_components/ui/FilterPopover";
 import TableNavbar2 from "~/app/_components/ui/TableNavbar2";
 import { useUpdateViewConfig } from "~/app/_components/useUpdateViewConfig";
 import type { WorkspaceProps } from "./TableWorkspace";
@@ -25,6 +31,9 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
         config.search,
     );
     const updateConfig = useUpdateViewConfig(viewId);
+    const columnWidths = useColumnWidths({ viewId, config });
+    const [addFilterRequest, setAddFilterRequest] =
+        useState<AddFilterRequest | null>(null);
 
     // The page cache is rebuilt whenever the saved filters or sort change.
     const configKey = useMemo(
@@ -52,6 +61,26 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
         [config.filters],
     );
 
+    // What the header's field menu and resize handles use.
+    const hiddenColumnIds = config.hiddenColumnIds;
+    const { update } = updateConfig;
+    const columnTools: GridColumnTools = {
+        tableId: table.id,
+        fields,
+        visibleFieldCount: fields.filter(
+            (field) => !hiddenColumnIds.includes(field.id),
+        ).length,
+        widths: columnWidths,
+        onSort: (columnId, direction) => update({ sort: { columnId, direction } }),
+        onFilterBy: (columnId) =>
+            setAddFilterRequest((previous) => ({
+                key: (previous?.key ?? 0) + 1,
+                columnId,
+            })),
+        onHide: (columnId) =>
+            update({ hiddenColumnIds: [...hiddenColumnIds, columnId] }),
+    };
+
     const pendingSort = updateConfig.pendingPatch?.sort;
     const isSortPending = pendingSort !== undefined;
     const displaySort = isSortPending ? pendingSort : config.sort;
@@ -77,8 +106,10 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
                 onSearchChange={setSearchInput}
                 recordCount={recordCount}
                 onRowsAdded={rowPages.reset}
+                addFilterRequest={addFilterRequest}
             >
                 <FillViewportHeight>
+                    <GridColumnToolsProvider value={columnTools}>
                     <Grid
                         tableId={table.id}
                         fields={fields}
@@ -89,6 +120,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
                         rowPages={rowPages}
                         scrollResetKey={configKey}
                     />
+                    </GridColumnToolsProvider>
                 </FillViewportHeight>
             </TableNavbar2>
         </div>

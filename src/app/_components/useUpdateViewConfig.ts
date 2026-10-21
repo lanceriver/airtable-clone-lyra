@@ -14,7 +14,7 @@ export type ViewConfigPatch = Omit<
  * Saves part of a view's config. The returned config replaces the cached
  * `view.get` data. Filters and sort change which rows the view shows, so the
  * view's row queries are reset to their first page (their old cursors don't
- * apply to the new result set). Hidden fields and search are applied to the
+ * apply to the new result set). Hidden fields, search and column widths are applied to the
  * cache optimistically.
  *
  * Saves can finish out of order (a sort change waits for its index to build).
@@ -29,7 +29,11 @@ export function useUpdateViewConfig(viewId: string) {
   const mutation = api.view.updateConfig.useMutation({
     onMutate: async (patch) => {
       const seq = sequence.next();
-      if (patch.hiddenColumnIds === undefined && patch.search === undefined) {
+      if (
+        patch.hiddenColumnIds === undefined &&
+        patch.search === undefined &&
+        patch.columnWidths === undefined
+      ) {
         return { previous: undefined, seq };
       }
       await utils.view.get.cancel({ viewId });
@@ -44,6 +48,9 @@ export function useUpdateViewConfig(viewId: string) {
                   hiddenColumnIds: patch.hiddenColumnIds,
                 }),
                 ...(patch.search !== undefined && { search: patch.search }),
+                ...(patch.columnWidths !== undefined && {
+                  columnWidths: patch.columnWidths,
+                }),
               },
             }
           : old,

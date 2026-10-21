@@ -27,7 +27,7 @@ import { api, type RouterOutputs } from "~/trpc/react"
 import type { ColumnType, ViewFilter, ViewSort } from "~/server/db/rows"
 import type { ViewConfigPatch } from "../useUpdateViewConfig"
 import TableSidebar from "./TableSidebar"
-import { FilterPopover } from "./FilterPopover"
+import { FilterPopover, type AddFilterRequest } from "./FilterPopover"
 import { SortPopover } from "./SortPopover"
 import { HideFieldsPopover } from "./HideFieldsPopover"
 
@@ -49,6 +49,8 @@ type NavbarProps = {
   recordCount?: { count: number; total: number };
   /** Called after "Add 100k rows" succeeds, for the grid to reload its rows. */
   onRowsAdded?: () => void;
+  /** Adds a filter on a field and opens the filter popover (field menu). */
+  addFilterRequest?: AddFilterRequest | null;
   children: React.ReactNode;
 }
 
@@ -59,7 +61,7 @@ function formatRecordCount({ count, total }: { count: number; total: number }) {
     : `${format(count)} of ${format(total)} records`;
 }
 
-export default function TableNavbar2({ baseId, tableId, viewId, viewName, columns, config, displaySort, isSortPending, onUpdateConfig, searchInput, onSearchChange, recordCount, onRowsAdded, children }: NavbarProps ) {
+export default function TableNavbar2({ baseId, tableId, viewId, viewName, columns, config, displaySort, isSortPending, onUpdateConfig, searchInput, onSearchChange, recordCount, onRowsAdded, addFilterRequest, children }: NavbarProps ) {
   const utils = api.useUtils();
 
   const { mutateAsync: addFakeRows, isPending: is100KPending } = api.row.addFakeRows.useMutation({
@@ -133,6 +135,7 @@ export default function TableNavbar2({ baseId, tableId, viewId, viewName, column
           columns={columns}
           filters={config.filters}
           onChange={handleFiltersChange}
+          addRequest={addFilterRequest}
         />
 
         <SortPopover

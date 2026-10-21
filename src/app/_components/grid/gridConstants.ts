@@ -5,6 +5,9 @@ export const ROW_NUMBER_WIDTH = 66;
 export const ADD_FIELD_WIDTH = 94;
 export const DEFAULT_COLUMN_WIDTH = 180;
 export const MIN_COLUMN_WIDTH = 100;
+export const MAX_COLUMN_WIDTH = 800;
+/** Longest field name the server accepts. */
+export const FIELD_NAME_MAX_LENGTH = 100;
 
 /** Spacer height above which scrolling is scaled (see scrollScale.ts). */
 export const SCROLL_CAP = 8_000_000;
