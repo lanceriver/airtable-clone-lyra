@@ -13,7 +13,8 @@ export type KeyEventLike = {
 
 export type KeyCommand =
   | { type: "action"; action: GridAction }
-  | { type: "clearCell" };
+  | { type: "clearCell" }
+  | { type: "addRecord" };
 
 type KeyContext = { editing: boolean; hasActive: boolean };
 
@@ -54,6 +55,9 @@ export function keyCommand(
         return null;
     }
   }
+
+  // Shift+Enter adds a record (Airtable's shortcut), selected cell or not.
+  if (key === "Enter" && shiftKey && !mod) return { type: "addRecord" };
 
   switch (key) {
     case "ArrowUp":
@@ -112,6 +116,8 @@ type Options = {
   canEdit: (rowIndex: number) => boolean;
   /** Delete / Backspace on the active cell. */
   clearCell: (rowIndex: number, col: number) => void;
+  /** Shift+Enter. */
+  addRecord: () => void;
 };
 
 /**
@@ -124,6 +130,7 @@ export function useGridKeyboard({
   dispatch,
   canEdit,
   clearCell,
+  addRecord,
 }: Options) {
   const { active, editing } = state;
   return useCallback(
@@ -140,12 +147,16 @@ export function useGridKeyboard({
         if (active) clearCell(active.row, active.col);
         return;
       }
+      if (command.type === "addRecord") {
+        addRecord();
+        return;
+      }
       const { action } = command;
       if (action.type === "startEdit" && (!active || !canEdit(active.row))) {
         return;
       }
       dispatch(action);
     },
-    [active, editing, dispatch, canEdit, clearCell],
+    [active, editing, dispatch, canEdit, clearCell, addRecord],
   );
 }

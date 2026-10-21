@@ -1,5 +1,6 @@
 import type { VirtualItem } from "@tanstack/react-virtual";
 
+import { ContextMenuTrigger } from "~/components/ui/context-menu";
 import type { RowRecord } from "~/server/db/rows";
 import { GridRow } from "./GridRow";
 import { ROW_HEIGHT, SKELETON_ROWS } from "./gridConstants";
@@ -77,33 +78,36 @@ export function GridBody({
     );
   }
 
+  // The row menu (Grid owns it) opens on right-click anywhere in the rows.
   return (
-    <div
-      role="rowgroup"
-      data-testid="grid-body"
-      className="relative"
-      style={{ width, height: spacerHeight }}
-    >
+    <ContextMenuTrigger asChild>
       <div
-        className="absolute top-0 left-0 w-full will-change-transform"
-        style={{
-          transform: `translateY(${anchorIndex * ROW_HEIGHT + layerShift}px)`,
-        }}
+        role="rowgroup"
+        data-testid="grid-body"
+        className="relative"
+        style={{ width, height: spacerHeight }}
       >
-        {virtualItems.map((item) => (
-          <GridRow
-            key={item.index}
-            index={item.index}
-            top={(item.index - anchorIndex) * ROW_HEIGHT}
-            row={getRow(item.index)}
-            columns={columns}
-            width={width}
-            searchLower={searchLower}
-            activeColumnId={item.index === activeRow ? activeColumnId : null}
-            editing={item.index === activeRow && editing}
-          />
-        ))}
+        <div
+          className="absolute top-0 left-0 w-full will-change-transform"
+          style={{
+            transform: `translateY(${anchorIndex * ROW_HEIGHT + layerShift}px)`,
+          }}
+        >
+          {virtualItems.map((item) => (
+            <GridRow
+              key={item.index}
+              index={item.index}
+              top={(item.index - anchorIndex) * ROW_HEIGHT}
+              row={getRow(item.index)}
+              columns={columns}
+              width={width}
+              searchLower={searchLower}
+              activeColumnId={item.index === activeRow ? activeColumnId : null}
+              editing={item.index === activeRow && editing}
+            />
+          ))}
+        </div>
       </div>
-    </div>
+    </ContextMenuTrigger>
   );
 }

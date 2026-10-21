@@ -85,10 +85,11 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
     const isSortPending = pendingSort !== undefined;
     const displaySort = isSortPending ? pendingSort : config.sort;
 
-    const recordCount =
-        rowPages.total !== undefined && rowPages.totalUnfiltered !== undefined
-            ? { count: rowPages.total, total: rowPages.totalUnfiltered }
-            : undefined;
+    // The record count lives in the grid's footer.
+    const clearFilters = () => {
+        setSearchInput("");
+        update({ filters: [], search: "" });
+    };
 
     return (
         <div className="flex flex-col overflow-auto h-full">
@@ -104,7 +105,6 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
                 onUpdateConfig={updateConfig.update}
                 searchInput={searchInput}
                 onSearchChange={setSearchInput}
-                recordCount={recordCount}
                 onRowsAdded={rowPages.reset}
                 addFilterRequest={addFilterRequest}
             >
@@ -119,6 +119,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
                         search={search}
                         rowPages={rowPages}
                         scrollResetKey={configKey}
+                        onClearFilters={clearFilters}
                     />
                     </GridColumnToolsProvider>
                 </FillViewportHeight>

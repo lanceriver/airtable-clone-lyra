@@ -36,6 +36,15 @@ describe("keyCommand, not editing", () => {
     expect(keyCommand(key(k), selected)).toEqual(act(action));
   });
 
+  it("Shift+Enter adds a record, with or without a selection", () => {
+    const shiftEnter = key("Enter", { shiftKey: true });
+    expect(keyCommand(shiftEnter, selected)).toEqual({ type: "addRecord" });
+    expect(keyCommand(shiftEnter, nothing)).toEqual({ type: "addRecord" });
+    expect(keyCommand(shiftEnter, editing)).toEqual(
+      act({ type: "commitEdit", move: "down" }),
+    );
+  });
+
   it("Shift+Tab goes back", () => {
     expect(keyCommand(key("Tab", { shiftKey: true }), selected)).toEqual(
       act({ type: "tab", shift: true }),

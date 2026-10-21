@@ -12,11 +12,21 @@ import {
   useLayoutEffect,
   useMemo,
   useRef,
+  useState,
   type MouseEvent,
 } from "react";
 
+import { Trash2 } from "lucide-react";
+
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+} from "~/components/ui/context-menu";
 import type { RowRecord, ViewSort } from "~/server/db/rows";
 import { GridBody } from "./GridBody";
+import { GridEmptyState } from "./GridEmptyState";
+import { GridFooter } from "./GridFooter";
 import { useGridColumnSizing } from "./GridColumnTools";
 import { GridHeader } from "./GridHeader";
 import {
@@ -44,6 +54,7 @@ import {
 } from "./scrollScale";
 import { useCellEditing } from "./useCellEditing";
 import { useGridKeyboard } from "./useGridKeyboard";
+import { useRowActions } from "./useRowActions";
 import type { RowPages } from "./useRowPages";
 import { useScaledVirtualizer } from "./useScaledVirtualizer";
 
@@ -60,10 +71,13 @@ export type GridProps = {
   search: string;
   rowPages: RowPages;
   /**
-   * The grid scrolls back to the top when this or the row count changes (the
-   * filters and sort, as a string).
+   * The grid scrolls back to the top when this or the search changes (the
+   * filters and sort, as a string). Adding or deleting a record keeps the
+   * scroll position.
    */
   scrollResetKey: string;
+  /** Empty-state button: clears the search text and the view's filters. */
+  onClearFilters: () => void;
 };
 
 const NO_ROWS: RowRecord[] = [];
@@ -82,6 +96,7 @@ export function Grid({
   search,
   rowPages,
   scrollResetKey,
+  onClearFilters,
 }: GridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -165,10 +180,11 @@ export function Grid({
     );
   }, [ensureRange, total, firstVisible, lastVisible]);
 
-  // A different result set starts at the top.
+  // A different result set starts at the top. The row count is not a reason:
+  // adding and deleting records keep the scroll position.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
-  }, [total, scrollResetKey]);
+  }, [scrollResetKey, search]);
 
   // -- Selection and keyboard ---------------------------------------------------
   const rowCount = total ?? 0;
@@ -198,12 +214,38 @@ export function Grid({
     },
     [columns, clearCellById],
   );
+  const { addRecord, adding, deleteRecord } = useRowActions({
+    tableId,
+    rowPages,
+    dispatch,
+    colCount,
+  });
   const onKeyDown = useGridKeyboard({
     state: selection,
     dispatch,
     canEdit,
     clearCell,
+    addRecord,
   });
+
+  // The row under the last right-click, for the "Delete record" menu item.
+  const [menuRow, setMenuRow] = useState<{ id: string } | null>(null);
+  const onContextMenu = (event: MouseEvent<HTMLDivElement>) => {
+    const target = event.target;
+    const rowElement =
+      target instanceof Element
+        ? target.closest<HTMLElement>("[data-row-index]")
+        : null;
+    if (!rowElement) {
+      setMenuRow(null);
+      return;
+    }
+    const rowIndex = Number(rowElement.dataset.rowIndex);
+    const row = getRow(rowIndex);
+    setMenuRow(row ? { id: row.id } : null);
+    const cell = cellAt(target);
+    dispatch({ type: "select", row: rowIndex, col: cell?.col ?? 0 });
+  };
 
   // Click selects, double-click edits. Delegated: cells have no handlers.
   const cellAt = (target: EventTarget): { row: number; col: number } | null => {
@@ -307,46 +349,92 @@ export function Grid({
 
   const searchLower = search.toLowerCase();
 
+  const emptyView = total === 0 && rowPages.totalUnfiltered !== undefined;
+
   return (
     <GridSelectionContext.Provider value={selectionValue}>
-      <div
-        ref={scrollRef}
-        role="grid"
-        tabIndex={0}
-        onKeyDown={onKeyDown}
-        onMouseDown={onMouseDown}
-        onDoubleClick={onDoubleClick}
-        aria-rowcount={(total ?? 0) + 1}
-        aria-colcount={columns.length + 1}
-        data-testid="grid-scroller"
-        data-hscrolled="false"
-        className="group/grid relative h-full w-full overflow-auto bg-white text-[13px] leading-[18px] text-[#1d1f25] outline-none select-none"
-        style={{ overscrollBehavior: "contain" }}
-        onScroll={(event) => {
-          // A data attribute drives the divider on the primary column with CSS,
-          // so horizontal scrolling doesn't re-render any row.
-          const element = event.currentTarget;
-          const scrolled = element.scrollLeft > 0 ? "true" : "false";
-          if (element.dataset.hscrolled !== scrolled) {
-            element.dataset.hscrolled = scrolled;
-          }
-        }}
-      >
-        <GridHeader tableId={tableId} columns={columns} width={rowWidth} />
-        <GridBody
-          virtualItems={virtualItems}
-          spacerHeight={scale.spacerHeight}
-          anchorIndex={anchorIndex}
-          layerShift={rowLayerShift(scale, virtualOffset)}
-          columns={columns}
-          width={rowWidth}
-          getRow={getRow}
-          searchLower={searchLower}
-          activeRow={activeRow}
-          activeColumnId={activeColumn?.id ?? null}
-          editing={editing}
-        />
-      </div>
+      <ContextMenu>
+        <div className="flex h-full w-full flex-col">
+          <div className="relative min-h-0 flex-1">
+            <div
+              ref={scrollRef}
+              role="grid"
+              tabIndex={0}
+              onKeyDown={onKeyDown}
+              onMouseDown={onMouseDown}
+              onDoubleClick={onDoubleClick}
+              onContextMenu={onContextMenu}
+              aria-rowcount={(total ?? 0) + 1}
+              aria-colcount={columns.length + 1}
+              data-testid="grid-scroller"
+              data-hscrolled="false"
+              className="group/grid absolute inset-0 overflow-auto bg-white text-[13px] leading-[18px] text-[#1d1f25] outline-none select-none"
+              style={{ overscrollBehavior: "contain" }}
+              onScroll={(event) => {
+                // A data attribute drives the divider on the primary column with CSS,
+                // so horizontal scrolling doesn't re-render any row.
+                const element = event.currentTarget;
+                const scrolled = element.scrollLeft > 0 ? "true" : "false";
+                if (element.dataset.hscrolled !== scrolled) {
+                  element.dataset.hscrolled = scrolled;
+                }
+              }}
+            >
+              <GridHeader
+                tableId={tableId}
+                columns={columns}
+                width={rowWidth}
+              />
+              <GridBody
+                virtualItems={virtualItems}
+                spacerHeight={scale.spacerHeight}
+                anchorIndex={anchorIndex}
+                layerShift={rowLayerShift(scale, virtualOffset)}
+                columns={columns}
+                width={rowWidth}
+                getRow={getRow}
+                searchLower={searchLower}
+                activeRow={activeRow}
+                activeColumnId={activeColumn?.id ?? null}
+                editing={editing}
+              />
+            </div>
+            {emptyView && (
+              <GridEmptyState
+                tableEmpty={rowPages.totalUnfiltered === 0}
+                adding={adding}
+                onAddRecord={addRecord}
+                onClearFilters={onClearFilters}
+              />
+            )}
+          </div>
+          <GridFooter
+            total={total}
+            totalUnfiltered={rowPages.totalUnfiltered}
+            isFetching={rowPages.isFetching}
+            adding={adding}
+            onAddRecord={addRecord}
+          />
+        </div>
+        <ContextMenuContent
+          onCloseAutoFocus={(event) => {
+            // Back to the grid, so the keyboard keeps working.
+            event.preventDefault();
+            selectionValue.focusGrid();
+          }}
+        >
+          <ContextMenuItem
+            variant="destructive"
+            disabled={menuRow === null}
+            onSelect={() => {
+              if (menuRow) void deleteRecord(menuRow.id);
+            }}
+          >
+            <Trash2 aria-hidden />
+            Delete record
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
     </GridSelectionContext.Provider>
   );
 }
