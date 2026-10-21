@@ -14,6 +14,7 @@ import {
   countRows,
   queryRows,
   rowCursorSchema,
+  rowOffsetSchema,
   type RowRecord,
 } from "~/server/db/rows";
 import { parseViewConfig, toColumnInfo } from "~/server/db/viewConfig";
@@ -55,11 +56,17 @@ export const rowRouter = createTRPCRouter({
       z.object({
         viewId: z.string(),
         limit: z.number().int().min(1).max(500).default(200),
+        // Continue after the previous page (keyset). Exclusive with offset.
         cursor: rowCursorSchema.nullish(),
+        // Jump to a page that has no cursor: skip this many matching rows.
+        offset: rowOffsetSchema.optional(),
         search: z.string().max(200).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
+      if (input.cursor && input.offset !== undefined) {
+        throw badRequest("cursor and offset are mutually exclusive");
+      }
       const userId = ctx.session.user.id;
       const view = await assertViewAccess(ctx.db, userId, input.viewId);
       const table = await assertTableAccess(ctx.db, userId, view.tableId);
@@ -72,6 +79,7 @@ export const rowRouter = createTRPCRouter({
         search: input.search ?? config.search,
         limit: input.limit,
         cursor: input.cursor,
+        offset: input.offset,
       });
     }),
 

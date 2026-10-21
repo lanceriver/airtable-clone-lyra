@@ -121,7 +121,7 @@ model Row {
     // Maintained by the row_search_text_trg trigger (see the jsonb_rows migration).
     searchText String   @default("") @map("search_text")
 
-    @@index([tableId, order])
+    @@unique([tableId, order])
     @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 

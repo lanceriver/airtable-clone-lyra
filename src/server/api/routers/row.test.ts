@@ -152,6 +152,108 @@ describe("getRows", () => {
     }
   });
 
+  it("serves offset pages equal to keyset pages, and continues by keyset", async () => {
+    const { owner, name, score, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    for (const sortColumn of [null, score.id, name.id]) {
+      await testDb.view.update({
+        where: { id: view.id },
+        data: {
+          sort: sortColumn
+            ? { columnId: sortColumn, direction: "desc" }
+            : Prisma.JsonNull,
+        },
+      });
+      const all = await caller.getRows({ viewId: view.id, limit: 500 });
+      expect(all.rows).toHaveLength(6);
+      for (const limit of [1, 2, 4]) {
+        for (let k = 0; k * limit < 6; k++) {
+          const jumped = await caller.getRows({
+            viewId: view.id,
+            limit,
+            offset: k * limit,
+          });
+          expect(jumped.rows).toEqual(
+            all.rows.slice(k * limit, (k + 1) * limit),
+          );
+          const last = (k + 1) * limit >= 6;
+          expect(jumped.nextCursor === null).toBe(last);
+          if (jumped.nextCursor) {
+            const next = await caller.getRows({
+              viewId: view.id,
+              limit,
+              cursor: jumped.nextCursor,
+            });
+            expect(next.rows).toEqual(
+              all.rows.slice((k + 1) * limit, (k + 2) * limit),
+            );
+          }
+        }
+      }
+      const beyond = await caller.getRows({ viewId: view.id, offset: 6 });
+      expect(beyond).toEqual({ rows: [], nextCursor: null });
+    }
+  });
+
+  it("applies filters and search to offset pages", async () => {
+    const { owner, name, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    // "a" matches Alice, Carol, Dave, alan (in row order).
+    const res = await caller.getRows({
+      viewId: view.id,
+      search: "a",
+      limit: 2,
+      offset: 2,
+    });
+    expect(names(res.rows, name.id)).toEqual(["Dave", "alan"]);
+    expect(res.nextCursor).toBeNull();
+  });
+
+  it("rejects cursor together with offset as BAD_REQUEST", async () => {
+    const { owner, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    const page = await caller.getRows({ viewId: view.id, limit: 2 });
+    expect(page.nextCursor).not.toBeNull();
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        limit: 2,
+        cursor: page.nextCursor,
+        offset: 2,
+      }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        cursor: { key: "0abc", id: "x" },
+        offset: 0,
+      }),
+      "BAD_REQUEST",
+    );
+    // A null cursor is the same as none.
+    const ok = await caller.getRows({
+      viewId: view.id,
+      limit: 2,
+      cursor: null,
+      offset: 2,
+    });
+    expect(ok.rows).toHaveLength(2);
+  });
+
+  it("rejects an invalid offset", async () => {
+    const { owner, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    for (const offset of [-1, 1.5, 10_000_001]) {
+      await expectCode(
+        caller.getRows({ viewId: view.id, offset }),
+        "BAD_REQUEST",
+      );
+    }
+    const max = await caller.getRows({ viewId: view.id, offset: 10_000_000 });
+    expect(max.rows).toEqual([]);
+  });
+
   it("rejects an out-of-range limit", async () => {
     const { owner, view } = await setup();
     await expectCode(
