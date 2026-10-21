@@ -181,8 +181,12 @@ export const viewRouter = createTRPCRouter({
       }
 
       if (input.hiddenColumnIds !== undefined) {
+        // The primary field (first by order) can't be hidden, as in Airtable.
+        const primaryId = columns[0]?.id;
         data.hiddenColumnIds = [
-          ...new Set(input.hiddenColumnIds.filter((id) => byId.has(id))),
+          ...new Set(
+            input.hiddenColumnIds.filter((id) => byId.has(id) && id !== primaryId),
+          ),
         ];
       }
 

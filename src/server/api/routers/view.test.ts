@@ -224,6 +224,20 @@ describe("view.updateConfig", () => {
     expect((await caller.get({ viewId: base.viewId })).config).toEqual(config);
   });
 
+  it("never hides the primary field and drops unknown ids", async () => {
+    const { owner, base, name, email, score } = await setup();
+    const caller = callerFor(owner.user.id);
+    const config = await caller.updateConfig({
+      viewId: base.viewId,
+      hiddenColumnIds: [name.id, email.id, "nope", email.id, score.id],
+    });
+    expect(config.hiddenColumnIds).toEqual([email.id, score.id]);
+    expect(
+      (await caller.updateConfig({ viewId: base.viewId, hiddenColumnIds: [name.id] }))
+        .hiddenColumnIds,
+    ).toEqual([]);
+  });
+
   it("creates the sort index when a sort is set and clears it with null", async () => {
     const { owner, base, score, name } = await setup();
     const caller = callerFor(owner.user.id);
@@ -340,12 +354,12 @@ describe("view.updateConfig", () => {
   });
 
   it("silently drops unknown and duplicate hidden column ids", async () => {
-    const { owner, base, name, email } = await setup();
+    const { owner, base, company, email } = await setup();
     const config = await callerFor(owner.user.id).updateConfig({
       viewId: base.viewId,
-      hiddenColumnIds: [name.id, "nope", email.id, name.id],
+      hiddenColumnIds: [company.id, "nope", email.id, company.id],
     });
-    expect(config.hiddenColumnIds).toEqual([name.id, email.id]);
+    expect(config.hiddenColumnIds).toEqual([company.id, email.id]);
   });
 });
 
