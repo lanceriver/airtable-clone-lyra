@@ -53,6 +53,9 @@ export const GridRow = memo(function GridRow({
         width,
         height: ROW_HEIGHT,
         transform: `translateY(${top}px)`,
+        // The editor's error message hangs below the row: keep it above the
+        // rows that follow (they are later siblings with their own layers).
+        zIndex: editing ? 15 : undefined,
       }}
     >
       <div
@@ -69,6 +72,7 @@ export const GridRow = memo(function GridRow({
           key={column.id}
           column={column}
           value={row?.data[column.id]}
+          rowId={row?.id}
           loaded={loaded}
           searchLower={searchLower}
           rowIndex={index}

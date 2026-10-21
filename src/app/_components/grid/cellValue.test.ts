@@ -5,6 +5,7 @@ import {
   formatCellValue,
   isValidPartialNumber,
   parseDraft,
+  withCellValue,
 } from "./cellValue";
 
 describe("formatCellValue", () => {
@@ -83,5 +84,24 @@ describe("cellValueChanged", () => {
     expect(cellValueChanged(5, 5)).toBe(false);
     expect(cellValueChanged("5", 5)).toBe(true);
     expect(cellValueChanged("a", "a")).toBe(false);
+  });
+});
+
+describe("withCellValue", () => {
+  const row = { id: "r1", order: 1, data: { a: "x", b: 2 } };
+
+  it("sets a cell without touching the original", () => {
+    const next = withCellValue(row, "a", "y");
+    expect(next).toEqual({ id: "r1", order: 1, data: { a: "y", b: 2 } });
+    expect(row.data.a).toBe("x");
+  });
+
+  it("adds a cell", () => {
+    expect(withCellValue(row, "c", 7).data).toEqual({ a: "x", b: 2, c: 7 });
+  });
+
+  it("removes the key for an empty value", () => {
+    expect(withCellValue(row, "a", null).data).toEqual({ b: 2 });
+    expect(withCellValue(row, "b", undefined).data).toEqual({ a: "x" });
   });
 });

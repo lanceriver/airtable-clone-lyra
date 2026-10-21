@@ -1,3 +1,4 @@
+import { CellEditor } from "./CellEditor";
 import { ROW_NUMBER_WIDTH } from "./gridConstants";
 import type { GridColumn } from "./gridTypes";
 
@@ -24,6 +25,8 @@ type GridCellProps = {
   column: GridColumn;
   /** The row's value for this field; undefined while the row is loading. */
   value: string | number | undefined;
+  /** Id of the row; undefined while the row is loading. */
+  rowId: string | undefined;
   loaded: boolean;
   /** Lower-cased search text, or "". */
   searchLower: string;
@@ -38,15 +41,19 @@ type GridCellProps = {
 
 /** Inset, so the outline never overlaps the neighbouring cells. */
 const ACTIVE_CLASS = "outline-2 -outline-offset-2 outline-[#166ee1]";
-const EDITING_CLASS =
-  "outline-[3px] -outline-offset-[3px] outline-[#166ee1] bg-white!";
+/** The editor input draws the outline itself; it is positioned in the cell. */
+const EDITING_CLASS = "bg-white!";
 
 const SHIMMER_WIDTHS = ["w-3/5", "w-2/5", "w-4/5", "w-1/2", "w-3/4"] as const;
 
-/** One read-only body cell. No hooks: hundreds of these render at once. */
+/**
+ * One body cell. No hooks: hundreds of these render at once. The active
+ * cell, while it is being edited, holds a `CellEditor` instead of the text.
+ */
 export function GridCell({
   column,
   value,
+  rowId,
   loaded,
   searchLower,
   rowIndex,
@@ -58,6 +65,9 @@ export function GridCell({
     "h-8 flex-none box-border border-b border-r border-[#dfe2e4] px-2 flex items-center";
   const sticky = column.isPrimary ? `sticky z-10 ${PRIMARY_SHADOW_CLASS}` : "";
   const activeClass = isEditing ? EDITING_CLASS : isActive ? ACTIVE_CLASS : "";
+  // The editor and its message are positioned against the cell (sticky cells
+  // already are positioned).
+  const positioned = isEditing && !column.isPrimary ? "relative" : "";
   const aria = {
     role: "gridcell",
     "aria-colindex": columnIndex + 2,
@@ -93,10 +103,19 @@ export function GridCell({
   return (
     <div
       {...aria}
-      className={`${base} ${sticky} ${cellBackground(column, matches)} ${isNumber ? "justify-end text-right tabular-nums" : ""} ${activeClass}`}
+      className={`${base} ${sticky} ${cellBackground(column, matches)} ${isNumber ? "justify-end text-right tabular-nums" : ""} ${activeClass} ${positioned}`}
       style={style}
     >
-      <span className="min-w-0 truncate whitespace-nowrap">{text}</span>
+      {isEditing ? (
+        <CellEditor
+          rowIndex={rowIndex}
+          rowId={rowId}
+          column={column}
+          value={value}
+        />
+      ) : (
+        <span className="min-w-0 truncate whitespace-nowrap">{text}</span>
+      )}
     </div>
   );
 }

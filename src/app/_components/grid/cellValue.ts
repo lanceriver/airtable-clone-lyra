@@ -1,4 +1,4 @@
-import type { ColumnType } from "~/server/db/rows";
+import type { ColumnType, RowRecord } from "~/server/db/rows";
 
 /** What a cell can hold: text, a number, or nothing (null / undefined). */
 export type CellValue = string | number | null | undefined;
@@ -51,4 +51,16 @@ export function cellValueChanged(
   next: string | number | null,
 ): boolean {
   return (current ?? null) !== next;
+}
+
+/** A copy of `row` with one cell set, or removed when `value` is null. */
+export function withCellValue(
+  row: RowRecord,
+  columnId: string,
+  value: string | number | null | undefined,
+): RowRecord {
+  const data = { ...row.data };
+  if (value === null || value === undefined) delete data[columnId];
+  else data[columnId] = value;
+  return { ...row, data };
 }

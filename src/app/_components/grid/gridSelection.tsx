@@ -19,6 +19,7 @@ import {
   type GridState,
 } from "./gridReducer";
 import type { GridColumn } from "./gridTypes";
+import type { CellEditing } from "./useCellEditing";
 
 /**
  * Selection state of the grid, for anything inside it that needs it: the cell
@@ -38,8 +39,10 @@ export type GridSelectionValue = {
   scrollerRef: RefObject<HTMLDivElement | null>;
   /** Moves keyboard focus back to the grid (after an editor closes). */
   focusGrid: () => void;
-  /** Delete / Backspace on a cell; the editing task wires the real one. */
-  clearCell: (rowIndex: number, columnId: string) => void;
+  /** Saves a cell (optimistically); see useCellEditing. */
+  setCell: CellEditing["setCell"];
+  /** Delete / Backspace on a cell: empties it. */
+  clearCell: CellEditing["clearCell"];
 };
 
 export const GridSelectionContext = createContext<GridSelectionValue | null>(

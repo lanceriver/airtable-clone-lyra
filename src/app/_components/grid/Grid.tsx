@@ -42,6 +42,7 @@ import {
   scrollLeftToRevealColumn,
   scrollTopToRevealRow,
 } from "./scrollScale";
+import { useCellEditing } from "./useCellEditing";
 import { useGridKeyboard } from "./useGridKeyboard";
 import type { RowPages } from "./useRowPages";
 import { useScaledVirtualizer } from "./useScaledVirtualizer";
@@ -63,11 +64,6 @@ export type GridProps = {
    * filters and sort, as a string).
    */
   scrollResetKey: string;
-  /**
-   * Delete / Backspace on the selected cell. The editing task implements the
-   * clearing; the grid only reports which cell.
-   */
-  onClearCell?: (rowIndex: number, columnId: string) => void;
 };
 
 const NO_ROWS: RowRecord[] = [];
@@ -86,7 +82,6 @@ export function Grid({
   search,
   rowPages,
   scrollResetKey,
-  onClearCell,
 }: GridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -195,12 +190,13 @@ export function Grid({
     (rowIndex: number) => getRow(rowIndex) !== undefined,
     [getRow],
   );
+  const { setCell, clearCell: clearCellById } = useCellEditing(rowPages);
   const clearCell = useCallback(
     (rowIndex: number, col: number) => {
       const columnId = columns[col]?.id;
-      if (columnId !== undefined) onClearCell?.(rowIndex, columnId);
+      if (columnId !== undefined) clearCellById(rowIndex, columnId);
     },
-    [columns, onClearCell],
+    [columns, clearCellById],
   );
   const onKeyDown = useGridKeyboard({
     state: selection,
@@ -232,22 +228,7 @@ export function Grid({
     if (canEdit(cell.row)) dispatch({ type: "startEdit" });
   };
 
-  // Clicking outside the grid finishes an edit (and keeps the selection).
-  useEffect(() => {
-    if (!editing) return;
-    const onOutsideMouseDown = (event: globalThis.MouseEvent) => {
-      const scroller = scrollRef.current;
-      if (
-        scroller &&
-        event.target instanceof Node &&
-        !scroller.contains(event.target)
-      ) {
-        dispatch({ type: "commitEdit", move: null });
-      }
-    };
-    document.addEventListener("mousedown", onOutsideMouseDown);
-    return () => document.removeEventListener("mousedown", onOutsideMouseDown);
-  }, [editing, dispatch]);
+  // Clicking anywhere else saves the edit: the editor listens for it.
 
   // Scroll the selected cell into view whenever it changes.
   const latest = useRef({ columns, scale });
@@ -303,7 +284,8 @@ export function Grid({
       activeColumn,
       scrollerRef: scrollRef,
       focusGrid: () => scrollRef.current?.focus({ preventScroll: true }),
-      clearCell: (rowIndex, columnId) => onClearCell?.(rowIndex, columnId),
+      setCell,
+      clearCell: clearCellById,
     }),
     [
       selection,
@@ -312,7 +294,8 @@ export function Grid({
       colCount,
       columns,
       activeColumn,
-      onClearCell,
+      setCell,
+      clearCellById,
     ],
   );
 
