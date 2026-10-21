@@ -191,8 +191,116 @@ describe("getRows", () => {
         }
       }
       const beyond = await caller.getRows({ viewId: view.id, offset: 6 });
-      expect(beyond).toEqual({ rows: [], nextCursor: null });
+      expect(beyond).toEqual({ rows: [], nextCursor: null, prevCursor: null });
     }
+  });
+
+  it("serves backward pages and prevCursor in every sort mode", async () => {
+    const { owner, name, score, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    for (const sortColumn of [null, score.id, name.id]) {
+      await testDb.view.update({
+        where: { id: view.id },
+        data: {
+          sort: sortColumn
+            ? { columnId: sortColumn, direction: "desc" }
+            : Prisma.JsonNull,
+        },
+      });
+      const all = await caller.getRows({ viewId: view.id, limit: 500 });
+      expect(all.prevCursor).toBeNull();
+      for (const limit of [1, 2, 4]) {
+        for (let k = 1; k * limit < 6; k++) {
+          const page = await caller.getRows({
+            viewId: view.id,
+            limit,
+            offset: k * limit,
+          });
+          expect(page.prevCursor).not.toBeNull();
+          const back = await caller.getRows({
+            viewId: view.id,
+            limit,
+            cursor: page.prevCursor,
+            direction: "backward",
+          });
+          const from = (k - 1) * limit;
+          expect(back.rows).toEqual(all.rows.slice(from, k * limit));
+          expect(back.prevCursor === null).toBe(from === 0);
+          expect(back.nextCursor).not.toBeNull();
+        }
+      }
+      // A backward window larger than what precedes the cursor row.
+      const third = await caller.getRows({
+        viewId: view.id,
+        limit: 1,
+        offset: 2,
+      });
+      const top = await caller.getRows({
+        viewId: view.id,
+        limit: 50,
+        cursor: third.prevCursor,
+        direction: "backward",
+      });
+      expect(top.rows).toEqual(all.rows.slice(0, 2));
+      expect(top.prevCursor).toBeNull();
+      // Explicit forward is the default.
+      expect(
+        await caller.getRows({
+          viewId: view.id,
+          limit: 2,
+          offset: 2,
+          direction: "forward",
+        }),
+      ).toEqual(await caller.getRows({ viewId: view.id, limit: 2, offset: 2 }));
+    }
+  });
+
+  it("rejects invalid backward requests as BAD_REQUEST", async () => {
+    const { owner, view } = await setup();
+    const caller = callerFor(owner.user.id);
+    const page = await caller.getRows({ viewId: view.id, limit: 2, offset: 2 });
+    await expectCode(
+      caller.getRows({ viewId: view.id, direction: "backward" }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.getRows({ viewId: view.id, cursor: null, direction: "backward" }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        cursor: page.prevCursor,
+        offset: 0,
+        direction: "backward",
+      }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        offset: 2,
+        direction: "backward",
+      }),
+      "BAD_REQUEST",
+    );
+    // A cursor from a differently sorted view does not apply.
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        cursor: { key: "0abc", id: "x" },
+        direction: "backward",
+      }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.getRows({
+        viewId: view.id,
+        cursor: page.prevCursor,
+        direction: "sideways" as never,
+      }),
+      "BAD_REQUEST",
+    );
   });
 
   it("applies filters and search to offset pages", async () => {

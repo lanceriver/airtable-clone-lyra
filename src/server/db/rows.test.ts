@@ -1021,6 +1021,271 @@ describe("pagination completeness (5,000 rows)", () => {
       });
       expect(sorted.text).toMatch(/, "id" ASC OFFSET \$\d+ LIMIT/);
     });
+
+    // -----------------------------------------------------------------------
+    describe("backward pages and prevCursor", () => {
+      for (const view of views) {
+        it(`${view.label}: backward page from page k's prevCursor equals page k-1`, async () => {
+          for (const limit of [137]) {
+            const { pages } = await walkPages(view.q(), limit);
+            expect(pages.length).toBeGreaterThan(2);
+            expect(pages[0]!.prevCursor).toBeNull();
+            for (let k = 1; k < pages.length; k++) {
+              const prev = pages[k]!.prevCursor;
+              expect(
+                prev,
+                `${view.label} limit=${limit} page ${k}`,
+              ).not.toBeNull();
+              const back = await queryRows(testDb, {
+                ...view.q(),
+                limit,
+                cursor: prev,
+                direction: "backward",
+              });
+              // Rows, nextCursor and prevCursor all match the forward page.
+              expect(
+                back,
+                `${view.label} limit=${limit} page ${k - 1}`,
+              ).toEqual(pages[k - 1]);
+            }
+          }
+        });
+
+        it(`${view.label}: prevCursor matches offset pages exactly`, async () => {
+          const limit = 137;
+          const { pages } = await walkPages(view.q(), limit);
+          for (const k of samplePages(pages.length)) {
+            const jumped = await queryRows(testDb, {
+              ...view.q(),
+              limit,
+              offset: k * limit,
+            });
+            expect(jumped.prevCursor).toEqual(pages[k]!.prevCursor);
+            expect(jumped.prevCursor === null).toBe(k === 0);
+            if (k > 0) {
+              const back = await queryRows(testDb, {
+                ...view.q(),
+                limit,
+                cursor: jumped.prevCursor,
+                direction: "backward",
+              });
+              expect(back).toEqual(
+                await queryRows(testDb, {
+                  ...view.q(),
+                  limit,
+                  offset: (k - 1) * limit,
+                }),
+              );
+            }
+          }
+        });
+
+        it(`${view.label}: walking backward from the last page covers everything`, async () => {
+          for (const limit of [137]) {
+            const { pages } = await walkPages(view.q(), limit);
+            const all = pages.flatMap((p) => p.rows.map((r) => r.id));
+            const lastIndex = pages.length - 1;
+            const last = await queryRows(testDb, {
+              ...view.q(),
+              limit,
+              offset: lastIndex * limit,
+            });
+            expect(last.rows).toEqual(pages[lastIndex]!.rows);
+
+            const walked: Page[] = [];
+            let cursor: RowCursor | null = last.prevCursor;
+            while (cursor) {
+              const back: Page = await queryRows(testDb, {
+                ...view.q(),
+                limit,
+                cursor,
+                direction: "backward",
+              });
+              walked.push(back);
+              cursor = back.prevCursor;
+              if (walked.length > 10_000) throw new Error("did not terminate");
+            }
+            // Page by page, the backward walk is the forward pages reversed.
+            expect(walked.map((p) => p.rows)).toEqual(
+              pages
+                .slice(0, lastIndex)
+                .map((p) => p.rows)
+                .reverse(),
+            );
+            const reassembled = [
+              ...walked.reverse().flatMap((p) => p.rows.map((r) => r.id)),
+              ...last.rows.map((r) => r.id),
+            ];
+            expect(new Set(reassembled).size).toBe(reassembled.length);
+            expect(reassembled).toEqual(all);
+          }
+        });
+
+        it(`${view.label}: an arbitrary backward window matches the full order`, async () => {
+          const { pages } = await walkPages(view.q(), 500);
+          const all = pages.flatMap((p) => p.rows);
+          // Row cursors come from the forward pages at the same indexes.
+          const small = (await walkPages(view.q(), 7)).pages;
+          const cursors = small.slice(1).map((p) => p.prevCursor!);
+          for (const [pi, cursor] of cursors.entries()) {
+            if (pi % 26 !== 0) continue;
+            const index = (pi + 1) * 7; // index of the cursor row
+            for (const limit of [1, 5, 50, 333]) {
+              const back = await queryRows(testDb, {
+                ...view.q(),
+                limit,
+                cursor,
+                direction: "backward",
+              });
+              const from = Math.max(0, index - limit);
+              expect(back.rows.map((r) => r.id)).toEqual(
+                all.slice(from, index).map((r) => r.id),
+              );
+              // Rows precede the window unless it reaches the top.
+              expect(back.prevCursor === null).toBe(from === 0);
+              // nextCursor points at the cursor row, which directly follows.
+              const following = await queryRows(testDb, {
+                ...view.q(),
+                limit: 1,
+                cursor: back.nextCursor,
+              });
+              expect(following.rows.map((r) => r.id)).toEqual([all[index]!.id]);
+            }
+          }
+        });
+      }
+
+      it("backward from the first row is empty with no cursors", async () => {
+        const first = await queryRows(testDb, { tableId, columns, limit: 3 });
+        const back = await queryRows(testDb, {
+          tableId,
+          columns,
+          limit: 10,
+          cursor: { order: first.rows[0]!.order, id: first.rows[0]!.id },
+          direction: "backward",
+        });
+        expect(back).toEqual({ rows: [], nextCursor: null, prevCursor: null });
+      });
+
+      it("a backward window reaching the top has no prevCursor, even when exactly full", async () => {
+        const q = { tableId, columns };
+        const { rows } = await queryRows(testDb, { ...q, limit: 11 });
+        const cursor = { order: rows[10]!.order, id: rows[10]!.id };
+        // Exactly 10 rows before the cursor row.
+        const exact = await queryRows(testDb, {
+          ...q,
+          limit: 10,
+          cursor,
+          direction: "backward",
+        });
+        expect(exact.rows).toEqual(rows.slice(0, 10));
+        expect(exact.prevCursor).toBeNull();
+        // One fewer: the extra row exists.
+        const short = await queryRows(testDb, {
+          ...q,
+          limit: 9,
+          cursor,
+          direction: "backward",
+        });
+        expect(short.rows).toEqual(rows.slice(1, 10));
+        expect(short.prevCursor).toEqual({
+          order: rows[1]!.order,
+          id: rows[1]!.id,
+        });
+      });
+
+      it("prevCursor is null exactly at the start of forward and offset pages", async () => {
+        const q = { tableId, columns, limit: 10 };
+        expect((await queryRows(testDb, q)).prevCursor).toBeNull();
+        expect(
+          (await queryRows(testDb, { ...q, cursor: null })).prevCursor,
+        ).toBeNull();
+        expect(
+          (await queryRows(testDb, { ...q, offset: 0 })).prevCursor,
+        ).toBeNull();
+        const second = await queryRows(testDb, { ...q, offset: 10 });
+        expect(second.prevCursor).toEqual({
+          order: second.rows[0]!.order,
+          id: second.rows[0]!.id,
+        });
+        // Past the end there is no first row to point at.
+        expect(
+          (await queryRows(testDb, { ...q, offset: 9_000_000 })).prevCursor,
+        ).toBeNull();
+        // An explicit forward direction behaves like the default.
+        expect(
+          await queryRows(testDb, { ...q, direction: "forward", offset: 20 }),
+        ).toEqual(await queryRows(testDb, { ...q, offset: 20 }));
+      });
+
+      it("rejects a backward page without a cursor, with offset, or with the wrong cursor kind", async () => {
+        const q = {
+          tableId,
+          columns,
+          limit: 10,
+          direction: "backward",
+        } as const;
+        await expect(queryRows(testDb, q)).rejects.toThrow(/require a cursor/);
+        await expect(queryRows(testDb, { ...q, cursor: null })).rejects.toThrow(
+          /require a cursor/,
+        );
+        await expect(queryRows(testDb, { ...q, offset: 0 })).rejects.toThrow(
+          /require a cursor/,
+        );
+        await expect(
+          queryRows(testDb, {
+            ...q,
+            cursor: { order: 5, id: "abc" },
+            offset: 10,
+          }),
+        ).rejects.toThrow(/offset/);
+        // A key cursor on an unsorted view, and an order cursor on a sorted one.
+        await expect(
+          queryRows(testDb, { ...q, cursor: { key: "0a", id: "abc" } }),
+        ).rejects.toThrow(/does not match/);
+        await expect(
+          queryRows(testDb, {
+            ...q,
+            sort: { columnId: text, direction: "asc" },
+            cursor: { order: 5, id: "abc" },
+          }),
+        ).rejects.toThrow(/does not match/);
+        await expect(
+          queryRows(testDb, {
+            ...q,
+            sort: { columnId: num, direction: "asc" },
+            cursor: { key: "not a number", id: "abc" },
+          }),
+        ).rejects.toThrow(/does not match/);
+      });
+
+      it("backward SQL flips the comparison and the ORDER BY", () => {
+        const base = { tableId, columns, limit: 10 };
+        const un = buildRowsQuery({
+          ...base,
+          cursor: { order: 9, id: "x" },
+          direction: "backward",
+        });
+        expect(un.text).toMatch(/"order" < \$\d+/);
+        expect(un.text).toContain('ORDER BY "order" DESC LIMIT');
+        const asc = buildRowsQuery({
+          ...base,
+          sort: { columnId: num, direction: "asc" },
+          cursor: { key: "1", id: "x" },
+          direction: "backward",
+        });
+        expect(asc.text).toMatch(/, "id"\) < \(/);
+        expect(asc.text).toMatch(/DESC, "id" DESC LIMIT/);
+        const desc = buildRowsQuery({
+          ...base,
+          sort: { columnId: num, direction: "desc" },
+          cursor: { key: "1", id: "x" },
+          direction: "backward",
+        });
+        expect(desc.text).toMatch(/, "id"\) > \(/);
+        expect(desc.text).toMatch(/ASC, "id" ASC LIMIT/);
+      });
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -1067,6 +1332,21 @@ describe("pagination completeness (5,000 rows)", () => {
         expect(plan, label).toContain("Row_tableId_order_key");
         expect(plan, label).not.toMatch(/Sort/);
       }
+    });
+
+    it("backward pages are reverse index scans without a sort", async () => {
+      const plan = await explain(
+        buildRowsQuery({
+          tableId,
+          columns,
+          limit: 100,
+          cursor: { order: 2000, id: "" },
+          direction: "backward",
+        }),
+      );
+      expect(plan).toContain("Index Scan Backward");
+      expect(plan).toContain("Row_tableId_order_key");
+      expect(plan).not.toMatch(/Sort/);
     });
 
     it("the database enforces unique orders per table", async () => {
@@ -1162,6 +1442,36 @@ describe("pagination completeness (5,000 rows)", () => {
         });
         const planNext = await explain(next);
         expect(planNext, `${c.label} cursor page\n${planNext}`).toContain(name);
+      }
+    });
+
+    it("backward pages use the same index, with no sort step", async () => {
+      for (const c of cases) {
+        const name = sortIndexName(tableId, c.col().id, c.direction);
+        const sort: ViewSort = { columnId: c.col().id, direction: c.direction };
+        const cursor = {
+          key: c.col().type === "number" ? "5" : "0apple",
+          id: "abc",
+        };
+        const forward = await explain(
+          buildRowsQuery({ tableId, columns, sort, limit: 100, cursor }),
+        );
+        const backward = await explain(
+          buildRowsQuery({
+            tableId,
+            columns,
+            sort,
+            limit: 100,
+            cursor,
+            direction: "backward",
+          }),
+        );
+        expect(backward, `${c.label}\n${backward}`).toContain(name);
+        expect(backward).not.toMatch(/Sort/);
+        // The two directions scan the one index in opposite directions.
+        expect(forward.includes("Index Scan Backward")).not.toBe(
+          backward.includes("Index Scan Backward"),
+        );
       }
     });
 

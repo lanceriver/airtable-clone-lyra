@@ -15,6 +15,7 @@ import {
   queryRows,
   rowCursorSchema,
   rowOffsetSchema,
+  RowQueryInputError,
   type RowRecord,
 } from "~/server/db/rows";
 import { parseViewConfig, toColumnInfo } from "~/server/db/viewConfig";
@@ -60,6 +61,8 @@ export const rowRouter = createTRPCRouter({
         cursor: rowCursorSchema.nullish(),
         // Jump to a page that has no cursor: skip this many matching rows.
         offset: rowOffsetSchema.optional(),
+        // "backward" returns the rows just before `cursor` (requires cursor).
+        direction: z.enum(["forward", "backward"]).optional(),
         search: z.string().max(200).optional(),
       }),
     )
@@ -67,20 +70,34 @@ export const rowRouter = createTRPCRouter({
       if (input.cursor && input.offset !== undefined) {
         throw badRequest("cursor and offset are mutually exclusive");
       }
+      if (input.direction === "backward") {
+        if (!input.cursor) throw badRequest("backward pages require a cursor");
+        if (input.offset !== undefined) {
+          throw badRequest("backward pages cannot be combined with offset");
+        }
+      }
       const userId = ctx.session.user.id;
       const view = await assertViewAccess(ctx.db, userId, input.viewId);
       const table = await assertTableAccess(ctx.db, userId, view.tableId);
       const config = parseViewConfig(view);
-      return queryRows(ctx.db, {
-        tableId: table.id,
-        columns: toColumnInfo(table.columns),
-        filters: config.filters,
-        sort: config.sort,
-        search: input.search ?? config.search,
-        limit: input.limit,
-        cursor: input.cursor,
-        offset: input.offset,
-      });
+      try {
+        return await queryRows(ctx.db, {
+          tableId: table.id,
+          columns: toColumnInfo(table.columns),
+          filters: config.filters,
+          sort: config.sort,
+          search: input.search ?? config.search,
+          limit: input.limit,
+          cursor: input.cursor,
+          offset: input.offset,
+          direction: input.direction,
+        });
+      } catch (error) {
+        if (error instanceof RowQueryInputError) {
+          throw badRequest(error.message);
+        }
+        throw error;
+      }
     }),
 
   countRows: protectedProcedure
