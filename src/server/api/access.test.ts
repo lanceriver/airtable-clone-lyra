@@ -48,13 +48,19 @@ describe("access helpers", () => {
     const { owner, other } = await setup();
     const base = await assertBaseAccess(testDb, owner.user.id, owner.base.id);
     expect(base.id).toBe(owner.base.id);
-    await expectNotFound(assertBaseAccess(testDb, other.user.id, owner.base.id));
+    await expectNotFound(
+      assertBaseAccess(testDb, other.user.id, owner.base.id),
+    );
     await expectNotFound(assertBaseAccess(testDb, owner.user.id, "nope"));
   });
 
   it("assertTableAccess returns columns in order", async () => {
     const { owner, other } = await setup();
-    const table = await assertTableAccess(testDb, owner.user.id, owner.table.id);
+    const table = await assertTableAccess(
+      testDb,
+      owner.user.id,
+      owner.table.id,
+    );
     expect(table.id).toBe(owner.table.id);
     expect(table.columns.map((c) => c.id)).toEqual(
       owner.columns.map((c) => c.id),
@@ -69,12 +75,26 @@ describe("access helpers", () => {
   it("assertTableAccess breaks order ties by createdAt", async () => {
     const { owner } = await setup();
     const a = await testDb.column.create({
-      data: { name: "tie-a", type: "string", tableId: owner.table.id, order: 9 },
+      data: {
+        name: "tie-a",
+        type: "string",
+        tableId: owner.table.id,
+        order: 9,
+      },
     });
     const b = await testDb.column.create({
-      data: { name: "tie-b", type: "string", tableId: owner.table.id, order: 9 },
+      data: {
+        name: "tie-b",
+        type: "string",
+        tableId: owner.table.id,
+        order: 9,
+      },
     });
-    const table = await assertTableAccess(testDb, owner.user.id, owner.table.id);
+    const table = await assertTableAccess(
+      testDb,
+      owner.user.id,
+      owner.table.id,
+    );
     const ids = table.columns.map((c) => c.id);
     expect(ids.slice(-2)).toEqual([a.id, b.id]);
   });
@@ -122,22 +142,24 @@ describe("baseRouter ownership", () => {
       headers: new Headers(),
     } as never);
 
-  it("rejects updateBase from another user and leaves the base unchanged", async () => {
+  it("rejects rename from another user and leaves the base unchanged", async () => {
     const { owner, other } = await setup();
     await expectNotFound(
-      callerFor(other.user.id).updateBase({
+      callerFor(other.user.id).rename({
         baseId: owner.base.id,
         name: "hijacked",
       }),
     );
-    const after = await testDb.base.findUnique({ where: { id: owner.base.id } });
+    const after = await testDb.base.findUnique({
+      where: { id: owner.base.id },
+    });
     expect(after?.name).toBe(owner.base.name);
   });
 
-  it("rejects deleteBase from another user and keeps the base", async () => {
+  it("rejects delete from another user and keeps the base", async () => {
     const { owner, other } = await setup();
     await expectNotFound(
-      callerFor(other.user.id).deleteBase({ baseId: owner.base.id }),
+      callerFor(other.user.id).delete({ baseId: owner.base.id }),
     );
     expect(
       await testDb.base.findUnique({ where: { id: owner.base.id } }),
@@ -147,20 +169,20 @@ describe("baseRouter ownership", () => {
   it("rejects a nonexistent base", async () => {
     const { owner } = await setup();
     await expectNotFound(
-      callerFor(owner.user.id).updateBase({ baseId: "nope", name: "x" }),
+      callerFor(owner.user.id).rename({ baseId: "nope", name: "x" }),
     );
-    await expectNotFound(callerFor(owner.user.id).deleteBase({ baseId: "nope" }));
+    await expectNotFound(callerFor(owner.user.id).delete({ baseId: "nope" }));
   });
 
   it("lets the owner rename and delete", async () => {
     const { owner } = await setup();
     const caller = callerFor(owner.user.id);
-    const renamed = await caller.updateBase({
+    const renamed = await caller.rename({
       baseId: owner.base.id,
       name: "renamed",
     });
     expect(renamed.name).toBe("renamed");
-    await caller.deleteBase({ baseId: owner.base.id });
+    await caller.delete({ baseId: owner.base.id });
     expect(
       await testDb.base.findUnique({ where: { id: owner.base.id } }),
     ).toBeNull();

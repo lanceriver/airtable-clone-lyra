@@ -1,188 +1,188 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-import { z } from "zod";
-import { TRPCError } from "@trpc/server";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
 import { Prisma } from "@prisma/client";
+import { TRPCError } from "@trpc/server";
+import { z } from "zod";
 
-export interface ViewSort {
-  columnId: string;
-  order: "asc" | "desc";
-  type?: "string" | "number"
-}
+import { assertTableAccess, assertViewAccess } from "~/server/api/access";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import {
+  NUMBER_OPERATORS,
+  TEXT_OPERATORS,
+  ensureSortIndex,
+  viewFilterSchema,
+  viewSortSchema,
+} from "~/server/db/rows";
+import { isUniqueViolation } from "~/server/db/tables";
+import {
+  parseViewConfig,
+  toColumnInfo,
+  type ViewConfig,
+} from "~/server/db/viewConfig";
 
-export interface ViewFilter {
-  columnId: string | undefined; // columnId can be undefined for global search
-  operator: "contains" | "does not contain" | "is" | "is not" | "empty" | "is not empty" | "gt" | "lt" | "gte" | "lte";
-  value?: string | number;
-};
+const nameSchema = z.string().trim().min(1).max(100);
+
+const nameTaken = () =>
+  new TRPCError({
+    code: "CONFLICT",
+    message: "A view with this name already exists",
+  });
+
+const badRequest = (message: string) =>
+  new TRPCError({ code: "BAD_REQUEST", message });
 
 export const viewRouter = createTRPCRouter({
-    createView: protectedProcedure
-        .input(z.object({ name: z.string().min(1), tableId: z.string().min(1), filters: z.object({columnId: z.string().min(1), operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty']), 
-                value: z.union([z.string().min(1), z.number()]).optional(),
-            }).array().optional(), sort: z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']), type: z.enum(['string', 'number']) }).optional() }))
-        .mutation(async ({ ctx, input}) => {
-            const columns = await ctx.db.column.findMany({
-                where: { tableId: input.tableId },
-                select: { id: true }
-            });
-            const view = await ctx.db.view.create({
-                data: {
-                    name: input.name,
-                    tableId: input.tableId,
-                    filters: input.filters ?? undefined,
-                    sort: input.sort ?? undefined,
-                    visibleColumns: columns.map(column => column.id)
-                }
-            })
-            if (!view) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create view" });
-            }
-            return view;
-        }),
-    queryView: protectedProcedure
-        .input(z.object({ id: z.string().min(1)}))
-        .query(async ({ ctx, input}) => {
-            const view = await ctx.db.view.findUnique({
-                where: { id: input.id },
-                select: {
-                    id: true,
-                    name: true,
-                    filters: true,
-                    sort: true,
-                },
-            });
-            if (!view) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
-            }
-            return view;
-        }),
-    getViews: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1)}))
-        .query(async ({ ctx, input}) => {
-            const views = await ctx.db.view.findMany({
-                where: { tableId: input.tableId},
-                orderBy: { createdAt: "asc" }
-            })
-            if (!views) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "No views found for this table" });
-            }
-            console.log("Fetched views:", views);
-            return views.map(view => ({
-                ...view,
-                sort: view.sort ? (typeof view.sort === "string" ? JSON.parse(view.sort) : view.sort) as ViewSort: null,
-                filters: view.filters ? (typeof view.filters === "string" ? JSON.parse(view.filters) : view.filters) as ViewFilter[] : null
-            }));
-        }),
-    getActiveView: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1)}))
-        .query(async ({ ctx, input}) => {
-            const view = await ctx.db.table.findFirst({
-                where: { id: input.tableId },
-                select: {
-                    activeViewId: true,
-                    views: {
-                        select: {
-                            id: true,
-                            name: true,
-                            filters: true,
-                            sort: true,
-                            visibleColumns: true,
-                        }
-                    }
-                }
-            });
-            if (!view?.activeViewId) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "Active view not found for this table" });
-            }
-            // Find the active view from the fetched views
-            const activeView = view.views.find(v => v.id === view.activeViewId);
-            if (!activeView) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "Active view not found in views" });
-            }
-            return activeView;
-        }),
-    deleteView: protectedProcedure
-        .input(z.object({ id: z.string().min(1)}))
-        .mutation(async ({ ctx, input}) => {
-            const deletedView = await ctx.db.view.delete({
-                where: { id: input.id}
-            })
-            if (!deletedView) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
-            }
-            return deletedView;
-        }),
-    updateView: protectedProcedure
-        .input(z.object({ 
-            id: z.string().min(1).nullish(), 
-            name: z.string().min(1).optional(),
-            filters: z.union([
-                z.object({
-                    columnId: z.string().optional(), 
-                    operator: z.enum(['contains', 'does not contain', 'is', 'is not', 'empty', 'is not empty', 'gt', 'lt', 'gte', 'lte']).optional(),
-                    value: z.union([z.string().min(1), z.number()]).optional(),
-                }), 
-                z.null()
-            ]).array().optional(), 
-            sort: z.union([z.object({ columnId: z.string().min(1), order: z.enum(['asc', 'desc']), type: z.enum(['number', 'string']) }), z.null()]).optional(),
-            visibleColumns: z.array(z.string().min(1)).optional()
-        }))
-        .mutation(async ({ ctx, input}) => {
-            console.log("Updating view with input:", input);
+  list: protectedProcedure
+    .input(z.object({ tableId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      await assertTableAccess(ctx.db, ctx.session.user.id, input.tableId);
+      return ctx.db.view.findMany({
+        where: { tableId: input.tableId },
+        select: { id: true, name: true },
+        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      });
+    }),
 
-            const { name, filters, sort, visibleColumns } = input;
-            
-            /* const updateData = {
-                name: name ?? undefined, 
-                filters: filters ?? Prisma.JsonNull,
-                sort: sort ?? Prisma.JsonNull
-            }; */
+  get: protectedProcedure
+    .input(z.object({ viewId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const view = await assertViewAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.viewId,
+      );
+      return {
+        id: view.id,
+        name: view.name,
+        tableId: view.tableId,
+        config: parseViewConfig(view),
+      };
+    }),
 
-            /* const updateData: any = {};
-            updateData.name = input.name;
-            updateData.filters = input.filters;
-            updateData.sort = input.sort;
-            console.log("Update data prepared:", updateData); */
+  create: protectedProcedure
+    .input(z.object({ tableId: z.string(), name: nameSchema.optional() }))
+    .mutation(async ({ ctx, input }) => {
+      await assertTableAccess(ctx.db, ctx.session.user.id, input.tableId);
+      let name = input.name;
+      if (!name) {
+        const existing = await ctx.db.view.findMany({
+          where: { tableId: input.tableId },
+          select: { name: true },
+        });
+        const taken = new Set(existing.map((v) => v.name));
+        let n = 1;
+        while (taken.has(`Grid view ${n}`)) n++;
+        name = `Grid view ${n}`;
+      }
+      try {
+        return await ctx.db.view.create({
+          data: { tableId: input.tableId, name },
+          select: { id: true, name: true },
+        });
+      } catch (e) {
+        if (isUniqueViolation(e)) throw nameTaken();
+        throw e;
+      }
+    }),
 
-            const updateData: Record<string, unknown> = {};
-        
-            if ('name' in input && input.name !== undefined) {
-                updateData.name = input.name;
-            }
-        
-            if ('filters' in input && input.filters !== undefined) {
-                updateData.filters = input.filters ?? Prisma.JsonNull;
-            }
+  rename: protectedProcedure
+    .input(z.object({ viewId: z.string(), name: nameSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertViewAccess(ctx.db, ctx.session.user.id, input.viewId);
+      try {
+        return await ctx.db.view.update({
+          where: { id: input.viewId },
+          data: { name: input.name },
+          select: { id: true, name: true },
+        });
+      } catch (e) {
+        if (isUniqueViolation(e)) throw nameTaken();
+        throw e;
+      }
+    }),
 
-            if (input.filters === undefined || input.filters === null) {
-                updateData.filters = [];
-            }
-        
-            if ('sort' in input && input.sort !== undefined) {
-                updateData.sort = input.sort ?? Prisma.JsonNull;
-            }
+  delete: protectedProcedure
+    .input(z.object({ viewId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const view = await assertViewAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.viewId,
+      );
+      await ctx.db.$transaction(async (tx) => {
+        const remaining = await tx.view.findMany({
+          where: { tableId: view.tableId, id: { not: view.id } },
+          select: { id: true },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+        });
+        const [next] = remaining;
+        if (!next) throw badRequest("A table needs at least one view");
+        await tx.table.updateMany({
+          where: { id: view.tableId, activeViewId: view.id },
+          data: { activeViewId: next.id },
+        });
+        await tx.view.delete({ where: { id: view.id } });
+      });
+      return { id: view.id };
+    }),
 
-            if ('visibleColumns' in input && input.visibleColumns !== undefined || input.visibleColumns !== null) {
-                updateData.visibleColumns = input.visibleColumns;
-            }
+  updateConfig: protectedProcedure
+    .input(
+      z.object({
+        viewId: z.string(),
+        filters: z.array(viewFilterSchema).max(20).optional(),
+        sort: viewSortSchema.optional(),
+        hiddenColumnIds: z.array(z.string()).optional(),
+        search: z.string().max(200).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }): Promise<ViewConfig> => {
+      const userId = ctx.session.user.id;
+      const view = await assertViewAccess(ctx.db, userId, input.viewId);
+      const table = await assertTableAccess(ctx.db, userId, view.tableId);
+      const columns = toColumnInfo(table.columns);
+      const byId = new Map(columns.map((c) => [c.id, c]));
 
-            if (!input.id) {
-                throw new TRPCError({ code: "BAD_REQUEST", message: "View id is required" });
-            }
-            const view = await ctx.db.view.update({
-                where: { id: input.id },
-                data: updateData
-            });
-            console.log("Updated view:", view);
+      const data: Prisma.ViewUpdateInput = {};
 
-            if (!view) {
-                throw new TRPCError({ code: "NOT_FOUND", message: "View not found" });
-            }
-            return view;
-        })
-})
+      if (input.filters !== undefined) {
+        for (const f of input.filters) {
+          const col = byId.get(f.columnId);
+          if (!col) throw badRequest(`Unknown field: ${f.columnId}`);
+          const valid =
+            col.type === "number" ? NUMBER_OPERATORS : TEXT_OPERATORS;
+          if (!valid.includes(f.operator)) {
+            throw badRequest(
+              `Operator "${f.operator}" is not valid for a ${col.type} field`,
+            );
+          }
+        }
+        data.filters = input.filters;
+      }
+
+      if (input.sort !== undefined) {
+        if (input.sort === null) {
+          data.sort = Prisma.DbNull;
+        } else {
+          const col = byId.get(input.sort.columnId);
+          if (!col) throw badRequest(`Unknown field: ${input.sort.columnId}`);
+          // Outside any transaction (CREATE INDEX CONCURRENTLY), and before the
+          // sort is saved so a saved sort always has its index.
+          await ensureSortIndex(ctx.db, table.id, col, input.sort.direction);
+          data.sort = input.sort;
+        }
+      }
+
+      if (input.hiddenColumnIds !== undefined) {
+        data.hiddenColumnIds = [
+          ...new Set(input.hiddenColumnIds.filter((id) => byId.has(id))),
+        ];
+      }
+
+      if (input.search !== undefined) data.search = input.search;
+
+      const updated = await ctx.db.view.update({
+        where: { id: view.id },
+        data,
+      });
+      return parseViewConfig(updated);
+    }),
+});
