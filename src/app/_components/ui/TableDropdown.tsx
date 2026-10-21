@@ -2,7 +2,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu"
@@ -22,63 +21,57 @@ import {
   PopoverTrigger,
 } from "~/components/ui/popover"
 import { Label } from "~/components/ui/label";
-import { E } from "node_modules/@faker-js/faker/dist/airline-BUL6NtOJ";
-
-
-
 
 type TableDropdownProps = {
     baseId: string;
     tableId: string;
     tableName: string;
-    selectedTab: string;
+    isSelected: boolean;
     tableCount: number;
-    firstTableId: string;
-    handleSelectTab?: (tableName: string, tableId: string) => void;
 }
 
-export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCount, firstTableId, handleSelectTab }: TableDropdownProps) {
+export function TableDropdown({ baseId, tableId, tableName, isSelected, tableCount }: TableDropdownProps) {
     const router = useRouter();
     const utils = api.useUtils();
 
+    const [menuOpen, setMenuOpen] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
-    const [newName, setNewName] = useState("");
+    const [newName, setNewName] = useState(tableName);
 
-    const { mutate: updateTable } = api.table.updateTable.useMutation({
+    const { mutate: renameTable } = api.table.rename.useMutation({
         onSuccess: () => {
-            void utils.table.getTables.invalidate();
-            handleSelectTab?.(newName, tableId);
+            void utils.table.list.invalidate({ baseId });
+            setIsOpen(false);
+            setMenuOpen(false);
         },
         onError: (error) => {
-            toast.error(`Error updating table! Please make sure you provide a unique table name.`);
+            toast.error(error.message);
         }
     })
 
-    const { mutate: deleteTable } = api.table.deleteTable.useMutation({
+    const { mutate: deleteTable } = api.table.delete.useMutation({
         onSuccess: async () => {
-            await utils.table.getTables.invalidate();
-            
-            const tables = await utils.table.getTables.fetch({ baseId });
-
-            handleSelectTab?.(tables[0]!.name, tables[0]!.id);
-            router.push(`/${baseId}/${firstTableId}`);
-            
+            await utils.table.list.invalidate({ baseId });
+            const tables = await utils.table.list.fetch({ baseId });
+            const next = tables.find((table) => table.id !== tableId);
+            router.push(next ? `/${baseId}/${next.id}` : `/${baseId}`);
         },
         onError: (error) => {
-            toast.error(`Error deleting table! ${error.message}`);
+            toast.error(error.message);
         }
     });
 
-    const handleUpdate = (name: string) => {
-        if (name === "") {
+    const handleRename = (name: string) => {
+        const trimmed = name.trim();
+        if (trimmed === "") {
             toast.error("Please enter a valid table name!");
             return;
         }
-        updateTable({ id: tableId, name: name});
+        renameTable({ tableId, name: trimmed });
     }
 
     const handleDelete = () => {
-        deleteTable({ id: tableId});
+        deleteTable({ tableId });
     }
     return (
         <div className="flex flex-row items-center">
@@ -86,25 +79,24 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCo
                 <button
                     className={cn(
                     "px-4 py-2 h-8 font-semibold hover:text-white rounded-none cursor-pointer transition-colors rounded-tl-sm",  
-                    selectedTab === tableName ? "bg-white text-black" : "text-white hover:bg-white/10 hover:bg-opacity-20",
+                    isSelected ? "bg-white text-black" : "text-white hover:bg-white/10 hover:bg-opacity-20",
                 )}
-                    onClick={() => {
-                        handleSelectTab?.(tableName, tableId);
-                    }
-                    }
                 >
                     {tableName}
                 </button>
             </Link>
-            {selectedTab === tableName && (
-            <DropdownMenu>
+            {isSelected && (
+            <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                 <DropdownMenuTrigger asChild>
                     <button className="bg-white h-8 px-2 rounded-tr-sm flex items-center border-blue-100">
                             <ChevronDown className="text-gray-500 ml-1 h-4 w-4" />
                     </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
-                    <Popover open={isOpen} onOpenChange={() => setIsOpen(!isOpen)}>
+                    <Popover open={isOpen} onOpenChange={(open) => {
+                        setIsOpen(open);
+                        if (open) setNewName(tableName);
+                    }}>
                         <PopoverTrigger asChild>
                             <Button variant="ghost">
                                 Rename table
@@ -115,12 +107,12 @@ export function TableDropdown({ baseId, tableId, tableName, selectedTab, tableCo
                                 <Label>Enter new table name:</Label>
                                 <form onSubmit={(e) => {
                                     e.preventDefault();
-                                    handleUpdate(newName);
+                                    handleRename(newName);
                                 }}>
                                     <Input value={newName} onChange={(e) => setNewName(e.target.value)}/>
                                 </form>  
                             </div>
-                            <Button className="w-1/4 bg-blue-500" disabled={newName === ""} onClick={() => handleUpdate(newName)}>Save</Button>
+                            <Button className="w-1/4 bg-blue-500" disabled={newName.trim() === ""} onClick={() => handleRename(newName)}>Save</Button>
                             
                         </PopoverContent>
                     </Popover>

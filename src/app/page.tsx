@@ -28,9 +28,7 @@ export default async function Home() {
     transformer: SuperJSON
   });
 
-  const bases = await helpers.base.getBases.fetch()
-  const baseIds = bases.map((base) => base.id);
-  console.log("Bases: ", bases);
+  const bases = await helpers.base.list.fetch()
 
   return (
     <HydrateClient>

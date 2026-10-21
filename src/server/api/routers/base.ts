@@ -1,47 +1,90 @@
 import { z } from "zod";
 
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { assertBaseAccess } from "~/server/api/access";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { dropSortIndexes } from "~/server/db/rows";
+import { createTableWithDefaults } from "~/server/db/tables";
+
+const nameSchema = z.string().trim().min(1).max(100);
 
 export const baseRouter = createTRPCRouter({
-    // Creates a new base for the user with the given name
-    createBase: protectedProcedure
-        .input(z.object({ name: z.string().min(1)}))
-        .mutation(async ({ ctx, input }) => {
-            return ctx.db.base.create({
-                data: {
-                    name: input.name,
-                    ownerId: ctx.session.user.id,
-                    createdAt: new Date(),
-                },
-            });
-        }),
-    // Get all created bases by the current user
-    getBases: protectedProcedure
-        .query(async ({ ctx }) => {
-            return ctx.db.base.findMany({
-                where: { ownerId: ctx.session.user.id},
-                orderBy: { createdAt: "asc"}
-            });
-        }),
-    // Given a baseId, update the base name with given input
-    updateBase: protectedProcedure
-        .input(z.object({ baseId: z.string().min(1), name: z.string().min(1)}))
-        .mutation(async ({ ctx, input}) => {
-            return ctx.db.base.update({
-                where: { id: input.baseId},
-                data: {name: input.name}
-            });
-        }),
-    // Delete a base by id
-    deleteBase: protectedProcedure
-        .input(z.object({ baseId: z.string().min(1)}))
-        .mutation(async ({ ctx, input }) => {
-            return ctx.db.base.delete({
-                where: { id: input.baseId}
-            });
-        })
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const bases = await ctx.db.base.findMany({
+      where: { ownerId: ctx.session.user.id },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      include: {
+        tables: {
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: 1,
+          select: {
+            id: true,
+            views: {
+              orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+              take: 1,
+              select: { id: true },
+            },
+          },
+        },
+      },
+    });
+    return bases.map((b) => ({
+      id: b.id,
+      name: b.name,
+      createdAt: b.createdAt,
+      updatedAt: b.updatedAt,
+      firstTableId: b.tables[0]?.id ?? null,
+      firstViewId: b.tables[0]?.views[0]?.id ?? null,
+    }));
+  }),
+
+  create: protectedProcedure
+    .input(z.object({ name: nameSchema.optional() }).optional())
+    .mutation(async ({ ctx, input }) => {
+      const base = await ctx.db.base.create({
+        data: {
+          name: input?.name ?? "Untitled Base",
+          ownerId: ctx.session.user.id,
+        },
+      });
+      try {
+        const { table, viewId } = await createTableWithDefaults(ctx.db, {
+          baseId: base.id,
+          name: "Table 1",
+        });
+        return { id: base.id, name: base.name, tableId: table.id, viewId };
+      } catch (e) {
+        await ctx.db.base.delete({ where: { id: base.id } }).catch(() => null);
+        throw e;
+      }
+    }),
+
+  rename: protectedProcedure
+    .input(z.object({ baseId: z.string(), name: nameSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBaseAccess(ctx.db, ctx.session.user.id, input.baseId);
+      return ctx.db.base.update({
+        where: { id: input.baseId },
+        data: { name: input.name },
+        select: { id: true, name: true },
+      });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ baseId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const base = await assertBaseAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.baseId,
+      );
+      const tables = await ctx.db.table.findMany({
+        where: { baseId: base.id },
+        select: { id: true },
+      });
+      for (const t of tables) {
+        await dropSortIndexes(ctx.db, { tableId: t.id });
+      }
+      await ctx.db.base.delete({ where: { id: base.id } });
+      return { id: base.id };
+    }),
 });

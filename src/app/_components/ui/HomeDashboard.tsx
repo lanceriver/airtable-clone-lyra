@@ -1,22 +1,18 @@
 "use client"
 
-import { api } from "~/trpc/react"
-import { CreateBaseForm } from "./CreateBase"
+import { api, type RouterOutputs } from "~/trpc/react"
 import { BaseCard } from "./BaseCard"
-import type { Base } from "@prisma/client"
-import { SidebarTrigger } from "~/components/ui/sidebar";
-import { HomeSidebar, CustomTrigger } from "./HomeSidebar"
+import { HomeSidebar } from "./HomeSidebar"
 
 
 type Props = {
-    initialBases: Base[];
+    initialBases: RouterOutputs["base"]["list"];
 }
 
 export function HomeDashboard({ initialBases }: Props) {
-const { data: bases, isLoading } = api.base.getBases.useQuery(undefined, {
-    initialData: initialBases,
-});
-
+    const { data: bases } = api.base.list.useQuery(undefined, {
+        initialData: initialBases,
+    });
 
     return (
         <div className="flex h-screen">
@@ -27,17 +23,18 @@ const { data: bases, isLoading } = api.base.getBases.useQuery(undefined, {
                         Home
                     </h1>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        {bases?.map((base) => (
-                            <BaseCard 
-                                key={base.id} 
-                                baseId={base.id} 
-                                baseName={base.name} 
+                        {bases.map((base) => (
+                            <BaseCard
+                                key={base.id}
+                                baseId={base.id}
+                                baseName={base.name}
+                                firstTableId={base.firstTableId}
+                                firstViewId={base.firstViewId}
                             />
                         ))}
                     </div>
                 </div>
             </main>
         </div>
-        
     )
 }

@@ -1,190 +1,145 @@
-import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { TRPCError } from "@trpc/server";
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
-import { db } from "~/server/db";
+import { z } from "zod";
+
+import { assertColumnAccess, assertTableAccess } from "~/server/api/access";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
+import { dropSortIndexes } from "~/server/db/rows";
+import { stripColumnKey } from "~/server/db/tables";
+import { parseViewConfig } from "~/server/db/viewConfig";
+
+const nameSchema = z.string().trim().min(1).max(100);
+
+const nameTaken = () =>
+  new TRPCError({
+    code: "CONFLICT",
+    message: "A field with this name already exists",
+  });
 
 export const columnRouter = createTRPCRouter({
-    createColumn: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1),
-            name: z.string().min(1), type: z.string().min(1)
-        }))
-        .mutation(async ({ctx, input}) => {
-            const existing = await ctx.db.column.findFirst({
-                where: {
-                    tableId: input.tableId,
-                    name: input.name
-                }
-            })
-            if (existing) {
-                throw new TRPCError({ code: "CONFLICT", message: "Column name must be unique!"})
-            }
-            const column = await ctx.db.column.create({
-                data: {
-                    name: input.name,
-                    tableId: input.tableId,
-                    type: input.type
-                }
-            })
-            if (!column) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create column!"})
-            }
-            const updateCount = await ctx.db.table.update({
-            where: {
-                id: input.tableId
-            },
+  create: protectedProcedure
+    .input(
+      z.object({
+        tableId: z.string(),
+        name: nameSchema,
+        type: z.enum(["string", "number"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const table = await assertTableAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.tableId,
+      );
+      // No per-row writes: a missing key in a row's JSONB data is an empty cell.
+      return ctx.db.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"col:" + table.id}))`;
+        const clash = await tx.column.findFirst({
+          where: {
+            tableId: table.id,
+            name: { equals: input.name, mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+        if (clash) throw nameTaken();
+        const max = await tx.column.aggregate({
+          where: { tableId: table.id },
+          _max: { order: true },
+        });
+        return tx.column.create({
+          data: {
+            tableId: table.id,
+            name: input.name,
+            type: input.type,
+            order: (max._max.order ?? -1) + 1,
+          },
+        });
+      });
+    }),
+
+  rename: protectedProcedure
+    .input(z.object({ columnId: z.string(), name: nameSchema }))
+    .mutation(async ({ ctx, input }) => {
+      const column = await assertColumnAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.columnId,
+      );
+      return ctx.db.$transaction(async (tx) => {
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${"col:" + column.tableId}))`;
+        const clash = await tx.column.findFirst({
+          where: {
+            tableId: column.tableId,
+            id: { not: column.id },
+            name: { equals: input.name, mode: "insensitive" },
+          },
+          select: { id: true },
+        });
+        if (clash) throw nameTaken();
+        return tx.column.update({
+          where: { id: column.id },
+          data: { name: input.name },
+        });
+      });
+    }),
+
+  delete: protectedProcedure
+    .input(z.object({ columnId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const column = await assertColumnAccess(
+        ctx.db,
+        ctx.session.user.id,
+        input.columnId,
+      );
+      const count = await ctx.db.column.count({
+        where: { tableId: column.tableId },
+      });
+      if (count <= 1) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "A table needs at least one field",
+        });
+      }
+
+      await stripColumnKey(ctx.db, {
+        tableId: column.tableId,
+        columnId: column.id,
+      });
+
+      const views = await ctx.db.view.findMany({
+        where: { tableId: column.tableId },
+      });
+      await ctx.db.$transaction(async (tx) => {
+        for (const view of views) {
+          const config = parseViewConfig(view);
+          const filters = config.filters.filter(
+            (f) => f.columnId !== column.id,
+          );
+          const hidden = config.hiddenColumnIds.filter(
+            (id) => id !== column.id,
+          );
+          const sortCleared = config.sort?.columnId === column.id;
+          const touched =
+            filters.length !== config.filters.length ||
+            hidden.length !== config.hiddenColumnIds.length ||
+            sortCleared;
+          if (!touched) continue;
+          await tx.view.update({
+            where: { id: view.id },
             data: {
-                colCount: {
-                    increment: 1
-                }
-            }
-            });
-            if (!updateCount) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update count!"})
-            }
-            return column;
-        }),
-    createNewColumn: protectedProcedure.input(z.object({ tableId: z.string().min(1),
-            name: z.string().min(1), type: z.string().min(1)
-        }))
-        .mutation(async ({ctx, input}) => {
-            const existing = await ctx.db.column.findFirst({
-                where: {
-                    tableId: input.tableId,
-                    name: input.name
-                }
-            })
-            if (existing) {
-                throw new TRPCError({ code: "CONFLICT", message: "Column name must be unique!"})
-            }
-            const column = await ctx.db.column.create({
-                data: {
-                    name: input.name,
-                    tableId: input.tableId,
-                    type: input.type
-                }
-            })
-            if (!column) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create column!"})
-            }
-            const parentTable = await ctx.db.table.findFirst({
-                where: {
-                    id: input.tableId
-                }
-            });
-            if (!parentTable) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to find parent table!"})
-            };
-            const rows = await ctx.db.row.findMany({
-                where: {
-                    tableId: input.tableId
-                },
-                select: {
-                    id: true,
-                },
-            });
-            if (!rows) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to find rows!"})
-            };
-            const cells = await ctx.db.cell.createMany({
-                data: rows.map((row) => ({
-                    rowId: row.id,
-                    columnId: column.id,
-                    stringValue: undefined,
-                    numberValue: undefined,
-                })),
-            });
-            if (!cells) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to create cells!"});
-            }
-            const updateView = await ctx.db.view.updateMany({
-                where: {
-                    tableId: input.tableId
-                },
-                data: {
-                    visibleColumns: {
-                        push: column.id,
-                    }
-                }
-            })
-            if (!updateView) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update views!"})
-            }
-            console.log("updateView:", updateView);
-            const updateCount = await ctx.db.table.update({
-            where: {
-                id: input.tableId
+              filters,
+              hiddenColumnIds: hidden,
+              ...(sortCleared ? { sort: Prisma.DbNull } : {}),
             },
-            data: {
-                colCount: {
-                    increment: 1
-                }
-            }
-            });
-            if (!updateCount) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update count!"})
-            }
-            return column;
-        }),
-    deleteColumn: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1), columnId: z.string().min(1)
-        }))
-        .mutation(async ({ctx, input}) => {
-            const column = await ctx.db.column.delete({
-                where: {
-                    id: input.columnId,
-                }
-            })
-            if (!column) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to delete column!"})
-            }
-            const updateCount = await ctx.db.table.update({
-            where: {
-                id: input.tableId
-            },
-            data: {
-                colCount: {
-                    decrement: 1
-                }
-            }
-            });
-            if (!updateCount) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update count!"})
-            }
-            return column;
-        }),
-    editColumn: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1), columnId: z.string().min(1),
-            newName: z.string().optional(), newType: z.string().optional()
-        }))
-        .mutation(async ({ctx, input}) => {
-            const column = await ctx.db.column.update({
-                where: {
-                    id: input.columnId,
-                },
-                data: {
-                    ...(input.newName !== undefined ? { name: input.newName } : {}),
-                    ...(input.newType !== undefined ? { type: input.newType } : {}),
-                }
-            });
-            if (!column) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to update column!"});
-            }
-            return column;
-        }),
-    getColumns: protectedProcedure
-        .input(z.object({ tableId: z.string().min(1)}))
-        .query(async ({ ctx, input}) => {
-            const columns = await ctx.db.column.findMany({
-                where: { tableId: input.tableId},
-                orderBy: { createdAt: "asc" },
-            });
-            if (!columns) {
-                throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Failed to get columns!"})
-            }
-            return columns;
-        }),
-})
+          });
+        }
+        await tx.column.delete({ where: { id: column.id } });
+      });
+
+      await dropSortIndexes(ctx.db, {
+        tableId: column.tableId,
+        columnId: column.id,
+      });
+      return { id: column.id };
+    }),
+});

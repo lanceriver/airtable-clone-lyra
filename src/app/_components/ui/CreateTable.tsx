@@ -3,61 +3,30 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { useState } from "react"
 import { api } from "~/trpc/react"
-import { generateFakeData, Table } from "./Table";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { useEffect } from "react";
-import { getLastVisitedTable, setLastVisitedTable } from "./BaseCard"
-import { set } from "zod"
 
-const DEFAULT_COL_COUNT = 4;
-const DEFAULT_ROW_COUNT = 5;
-
-export function CreateTableForm({ baseId, onSuccess, handleSelectTab }: { baseId: string, onSuccess?: () => void, handleSelectTab: (tableName: string, tableId: string) => void }) {
+export function CreateTableForm({ baseId, onSuccess }: { baseId: string, onSuccess?: () => void }) {
     const router = useRouter();
     const [tableName, setTableName] = useState("");
-    const [colCount, setColCount] = useState(DEFAULT_COL_COUNT);
-    const [rowCount, setRowCount] = useState(DEFAULT_ROW_COUNT);
-    const [error, setError] = useState(false);
-    const [errorType, setErrorType] = useState("");
     const utils = api.useUtils();
-    const { mutate: createTable } = api.table.createTable.useMutation({
-        onSuccess: () => {
-            void utils.table.getTables.invalidate();
+    const { mutate: createTable } = api.table.create.useMutation({
+        onSuccess: (table) => {
+            void utils.table.list.invalidate({ baseId });
+            setTableName("");
+            router.push(`/${baseId}/${table.id}?viewId=${table.viewId}`);
+            onSuccess?.();
         },
         onError: (error) => {
-            setError(true);
-            console.log(error);
-            console.error("Error creating table:", error);
+            toast.error(error.message);
         }
-    }); 
+    });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const seed = Math.floor(Math.random() * 1000000);
-        
-        createTable({ baseId, name: tableName, colCount, rowCount, seed }, {
-            onSuccess: (createdTable) => {
-                console.log("Table created successfully:", createdTable);
-                setTableName("");
-                handleSelectTab(tableName, createdTable.id);
-                setLastVisitedTable(baseId, createdTable.id);
-                console.log("Last visited table set:", getLastVisitedTable(baseId));
-                router.push(`/${baseId}/${createdTable.id}?seed=${seed}`);
-                onSuccess?.();
-            },
-            onError: (error) => {
-                console.log(error.data);
-            }
-        });
+        createTable({ baseId, name: tableName.trim() || undefined });
     };
-    useEffect(() => {
-    if (error) {
-        toast("Please enter a valid and unique table name.");
-        const timer = setTimeout(() => setError(false), 3000); // 3 seconds
-        return () => clearTimeout(timer);
-    }
-    }, [error]);
+
     return (
         <form id="create-table-form" onSubmit={handleSubmit}>
             <div className="grid gap-4 py-4">

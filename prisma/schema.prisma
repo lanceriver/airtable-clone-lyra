@@ -62,7 +62,6 @@ model Base {
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
     tables    Table[]
-    tableCount Int     @default(0)
 }
 
 model Table {
@@ -75,9 +74,6 @@ model Table {
     columns   Column[]
     rows      Row[]
     views     View[]
-    colCount  Int
-    rowCount  Int
-    seed      Int?
     activeViewId String?
 
     @@unique([baseId, name])
@@ -88,15 +84,12 @@ model View {
     name      String
     tableId   String
     table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
-    columns   Column[] @relation("ViewColumns")
-    columnIds String[] @default([])
-    filters   Json[] 
-    sort      Json? 
-    visibleColumns String[]
+    filters   Json     @default("[]")
+    sort      Json?
+    hiddenColumnIds String[] @default([])
+    search    String   @default("")
     createdAt DateTime @default(now())
     updatedAt DateTime @updatedAt
-    /* colCount  Int
-    rowCount  Int */
 
     @@unique([tableId, name])
     @@map("views") // maps your model to a table named "views" since "view" is a reserved keyword in some SQL dialects
@@ -111,39 +104,25 @@ model Column {
     createdAt  DateTime @default(now())
     updatedAt  DateTime @updatedAt
     type       String
-    cells      Cell[]
-    views      View[]   @relation("ViewColumns")
+    order      Int      @default(0)
 
     //@@unique([tableId, position])
 }
 
 model Row {
-    //position   Int      
     id         String   @id @default(cuid())
     tableId    String
     table      Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
     createdAt  DateTime @default(now())
     updatedAt  DateTime @updatedAt
-    cells      Cell[]
-    
-    //@@unique([tableId, position])
-}
+    // Values keyed by column id. An empty cell is a missing key.
+    data       Json     @default("{}")
+    order      Int
+    // Maintained by the row_search_text_trg trigger (see the jsonb_rows migration).
+    searchText String   @default("") @map("search_text")
 
-model Cell {
-    id        String   @id @default(cuid())
-    rowId     String
-    columnId    String
-    row       Row      @relation(fields: [rowId], references: [id], onDelete: Cascade)
-    column    Column   @relation(fields: [columnId], references: [id], onDelete: Cascade)
-    createdAt DateTime @default(now())
-    updatedAt DateTime @updatedAt
-    stringValue     String?
-    numberValue     Int?
-    @@index([stringValue])
-    @@index([numberValue])
-    @@index([rowId])
-    @@index([columnId])
-    @@unique([rowId, columnId])
+    @@index([tableId, order])
+    @@index([searchText(ops: raw("gin_trgm_ops"))], type: Gin)
 }
 
 model VerificationToken {

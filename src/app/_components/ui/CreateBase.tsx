@@ -14,41 +14,27 @@ import { Input } from "~/components/ui/input"
 import { Label } from "~/components/ui/label"
 import { useState } from "react"
 import { api } from "~/trpc/react"
-import { Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export function CreateBaseForm() {
-    const { mutate: createBase } = api.base.createBase.useMutation();
-
-    const { mutate: createTable } = api.table.createTable.useMutation();
+    const router = useRouter();
+    const utils = api.useUtils();
+    const { mutate: createBase } = api.base.create.useMutation({
+        onSuccess: (base) => {
+            void utils.base.list.invalidate();
+            router.push(`/${base.id}/${base.tableId}?viewId=${base.viewId}`);
+        },
+        onError: (error) => {
+            toast.error(error.message);
+        },
+    });
 
     const [baseName, setBaseName] = useState("");
-    const [tableId, setTableId] = useState("");
-    const utils = api.useUtils();
 
     const handleSubmit = () => {
-        console.log("Base name: ", baseName);
+        createBase({ name: baseName.trim() || undefined });
         setBaseName("");
-        
-        createBase({ name: baseName }, {
-            onSuccess: (base) => {
-                void utils.base.getBases.invalidate();
-                const seed = Math.floor(Math.random() * 1000000);
-                createTable({
-                    name: "Table 1",
-                    baseId: base.id,
-                    colCount: 4,
-                    rowCount: 5,
-                    seed: seed,
-                }, {
-                    onSuccess: (table) => {
-                        void utils.table.getTables.invalidate({baseId: base.id});
-                        console.log("Table created: ", table);
-                        setTableId(table.id);
-                    }
-                }
-            );
-            }
-        })
     }
     return (
         <div>
