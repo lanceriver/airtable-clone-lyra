@@ -68,7 +68,7 @@ export const viewRouter = createTRPCRouter({
           select: { name: true },
         });
         const taken = new Set(existing.map((v) => v.name));
-        let n = 1;
+        let n = 2; // "Grid view" itself is view 1
         while (taken.has(`Grid view ${n}`)) n++;
         name = `Grid view ${n}`;
       }

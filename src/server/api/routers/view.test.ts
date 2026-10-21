@@ -96,15 +96,15 @@ describe("view.list / get", () => {
 });
 
 describe("view.create", () => {
-  it("defaults to the lowest free Grid view N with default config", async () => {
+  it("defaults to the lowest free Grid view N (from 2) with default config", async () => {
     const { owner, base } = await setup();
     const caller = callerFor(owner.user.id);
     const a = await caller.create({ tableId: base.tableId });
     const b = await caller.create({ tableId: base.tableId });
-    expect([a.name, b.name]).toEqual(["Grid view 1", "Grid view 2"]);
+    expect([a.name, b.name]).toEqual(["Grid view 2", "Grid view 3"]);
     await caller.delete({ viewId: a.id });
     expect((await caller.create({ tableId: base.tableId })).name).toBe(
-      "Grid view 1",
+      "Grid view 2",
     );
     expect((await caller.get({ viewId: b.id })).config).toEqual({
       filters: [],
