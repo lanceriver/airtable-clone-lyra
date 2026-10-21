@@ -21,7 +21,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "bench": "tsx scripts/bench.ts"
+    "bench": "tsx scripts/bench.ts",
+    "vercel-build": "node scripts/vercel-build.mjs"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.7.2",
