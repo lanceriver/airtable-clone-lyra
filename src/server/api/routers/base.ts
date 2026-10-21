@@ -1,10 +1,7 @@
 import { z } from "zod";
 
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  publicProcedure,
-} from "~/server/api/trpc";
+import { assertBaseAccess } from "~/server/api/access";
+import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 
 export const baseRouter = createTRPCRouter({
     // Creates a new base for the user with the given name
@@ -31,6 +28,7 @@ export const baseRouter = createTRPCRouter({
     updateBase: protectedProcedure
         .input(z.object({ baseId: z.string().min(1), name: z.string().min(1)}))
         .mutation(async ({ ctx, input}) => {
+            await assertBaseAccess(ctx.db, ctx.session.user.id, input.baseId);
             return ctx.db.base.update({
                 where: { id: input.baseId},
                 data: {name: input.name}
@@ -40,6 +38,7 @@ export const baseRouter = createTRPCRouter({
     deleteBase: protectedProcedure
         .input(z.object({ baseId: z.string().min(1)}))
         .mutation(async ({ ctx, input }) => {
+            await assertBaseAccess(ctx.db, ctx.session.user.id, input.baseId);
             return ctx.db.base.delete({
                 where: { id: input.baseId}
             });
