@@ -1,11 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { api } from "~/trpc/react";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu"
 import {
@@ -15,15 +13,11 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
-  DialogClose
 } from "~/components/ui/dialog"
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select"
@@ -32,58 +26,35 @@ import { Label } from "~/components/ui/label"
 import { Button } from "~/components/ui/button";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
-import { set } from "zod";
 
-export function CreateColumn({ tableId, colCount } : { tableId: string, colCount: number}) {
+export function CreateColumn({ tableId } : { tableId: string }) {
     const utils = api.useUtils();
     const [columnName, setColumnName] = useState("");
-    const [columnType, setColumnType] = useState(""); 
+    const [columnType, setColumnType] = useState<"string" | "number">("string");
     const [createDialogOpen, setCreateDialogOpen] = useState(false);
-    const [editDialogOpen, setEditDialogOpen] = useState(false);
-    const [error, setError] = useState(false);
 
-    const { mutate: createNewColumn, isPending: isCreating } = api.column.createNewColumn.useMutation({
-            onSuccess: () => {
-              void utils.column.getColumns.invalidate();
-              void utils.view.getActiveView.invalidate();
-              void utils.view.getViews.invalidate();
-              setCreateDialogOpen(false);
-              setColumnName("");
-              setColumnType("");
-              toast.success("Column created successfully!");
-            },
-            onError: (error) => {
-                setError(true);
-                setColumnType("");
-                toast.error("Error creating column:" + error.message);
-            }
-    });
-
-    const handleCreate = (tableId: string, position: number, name: string, type: string) => {
-        createNewColumn({
-            tableId: tableId,
-            name: name,
-            type: type
-    });
-    }
-    
-    const { mutate: editColumn } = api.column.editColumn.useMutation({
+    const { mutate: createColumn, isPending: isCreating } = api.column.create.useMutation({
         onSuccess: () => {
-          void utils.column.getColumns.invalidate();
-          setEditDialogOpen(false);
-          setColumnName("");
+            void utils.table.get.invalidate({ tableId });
+            setCreateDialogOpen(false);
+            setColumnName("");
+            setColumnType("string");
+            toast.success("Column created successfully!");
         },
         onError: (error) => {
-            setError(true);
+            toast.error(error.message);
         }
-      })
-      useEffect(() => {
-        if (error) {
-        toast("Please enter a valid and unique column name.");
-        const timer = setTimeout(() => setError(false), 3000); // 3 seconds
-        return () => clearTimeout(timer);
+    });
+
+    const handleCreate = () => {
+        const name = columnName.trim();
+        if (name === "") {
+            toast.error("Please enter a column name.");
+            return;
         }
-        }, [error]);
+        createColumn({ tableId, name, type: columnType });
+    }
+
     return (
         <>
         <DropdownMenu>
@@ -117,8 +88,8 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                             <Label htmlFor="type" className="text-right">
                                 Column Type
                             </Label>
-                            <Select onValueChange={(value) => setColumnType(value)}>
-                              <SelectTrigger className="col-span-3 w-full">
+                            <Select value={columnType} onValueChange={(value) => setColumnType(value as "string" | "number")}>
+                              <SelectTrigger id="type" className="col-span-3 w-full">
                                 <SelectValue placeholder="Select a column type"/>
                               </SelectTrigger>
                               <SelectContent>
@@ -127,12 +98,9 @@ export function CreateColumn({ tableId, colCount } : { tableId: string, colCount
                               </SelectContent>
                             </Select>
                             </div>
-                            
-                            <div className="grid grid-cols-4 items-center gap-4">
-                            </div>
                             </div>
                             <DialogFooter>
-                                    <Button type="submit" onClick={() => handleCreate(tableId, colCount, columnName, columnType)}>{isCreating ? "Saving..." : "Save changes"}</Button>
+                                    <Button type="submit" disabled={isCreating} onClick={handleCreate}>{isCreating ? "Saving..." : "Save changes"}</Button>
                             </DialogFooter>
                             </DialogContent>
                         </Dialog>

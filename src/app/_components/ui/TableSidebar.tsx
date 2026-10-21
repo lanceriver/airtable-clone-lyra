@@ -1,13 +1,11 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState } from "react"
 import { useRouter } from "next/navigation";
 import { api } from "~/trpc/react"
 import { toast } from "sonner"
 import {
   Calendar,
-  ChevronDown,
-  Grid,
   LayoutGrid,
   List,
   Plus,
@@ -18,7 +16,7 @@ import {
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Separator } from "~/components/ui/separator"
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "~/components/ui/collapsible"
+import { Collapsible, CollapsibleContent } from "~/components/ui/collapsible"
 import {
   Popover,
   PopoverContent,
@@ -30,111 +28,87 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "~/components/ui/context-menu"
-import { type ViewFilter } from "~/server/api/routers/view"
 
 type SidebarProps = {
   baseId: string;
   tableId: string;
-  filters: ViewFilter[] | null;
-  sort: {
-    columnId: string;
-    order: "asc" | "desc";  
-  } | null,
-  activeViewId?: string | null;
-  handleViewChange?: (viewId: string) => void;
-  setIsFiltered?: (isFiltering: boolean) => void;
+  activeViewId: string;
 };
 
-export default function TableSidebar({ baseId, tableId, filters, sort, activeViewId, handleViewChange, setIsFiltered}: SidebarProps) {
+export default function TableSidebar({ baseId, tableId, activeViewId }: SidebarProps) {
   const utils = api.useUtils();
   const router = useRouter();
 
   const [createExpanded, setCreateExpanded] = useState(true);
+  const [createOpen, setCreateOpen] = useState(false);
   const [viewName, setViewName] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
+  const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  console.log("TableSidebar props:", {
-    tableId,
-    filters,
-    sort,
-    activeViewId,
-    handleViewChange,
-  });
+  const goToView = (viewId: string) => {
+    router.push(`/${baseId}/${tableId}?viewId=${viewId}`);
+  };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (isEditing) {
-      // Update existing view
-      if (editName === "") {
-        toast.error("Please enter a new name for the view.");
-        return;
-      }
-      updateView({
-        id: activeViewId ?? "",
-        name: editName,
-      });
-      setIsEditing(false);
-      setEditName("");
-      return;
-    }
-    else {
-      if (viewName === "") {
-        toast.error("Please enter a view name.");
-        return;
-      } 
-      createView({ 
-      name: viewName, 
-      tableId: tableId, 
-      filters: undefined,
-      sort: undefined,
-    });
-    }
-    
-  }
+  const { data: views } = api.view.list.useQuery({ tableId });
 
-  const { data: views, isLoading: isViewsLoading } = api.view.getViews.useQuery({
-    tableId: tableId
-  });
-
-  const { mutate: createView } = api.view.createView.useMutation({
-    onSuccess: (newView) => {
-      void utils.view.getViews.invalidate();
-      router.push(`/${baseId}/${tableId}?viewId=${newView.id}`);
+  const { mutate: createView } = api.view.create.useMutation({
+    onSuccess: async (newView) => {
+      await Promise.all([
+        utils.view.list.invalidate({ tableId }),
+        utils.table.get.invalidate({ tableId }),
+      ]);
+      setCreateOpen(false);
+      setViewName("");
+      goToView(newView.id);
       toast.success(`View "${newView.name}" created successfully!`);
     },
     onError: (error) => {
-      toast.error(`Failed to create view: ${error.message}`);
+      toast.error(error.message);
     }
   });
 
-  const { mutate: updateView } = api.view.updateView.useMutation({
-    onSuccess: (newView) => {
-      void utils.view.getViews.invalidate();
-      toast.success(`View "${newView.name}" updated successfully!`);
+  const { mutate: renameView } = api.view.rename.useMutation({
+    onSuccess: (view) => {
+      void utils.view.list.invalidate({ tableId });
+      void utils.table.get.invalidate({ tableId });
+      void utils.view.get.invalidate({ viewId: view.id });
     },
     onError: (error) => {
-      toast.error(`Failed to update view: ${error.message}`);
+      toast.error(error.message);
     }
   })
 
-  const { mutate: deleteView } = api.view.deleteView.useMutation({
-    onSuccess: () => {
-      void utils.view.getViews.invalidate();
-      const viewsAfterDelete = views?.filter(view => view.id !== activeViewId);
-      router.push(`/${baseId}/${tableId}?viewId=${viewsAfterDelete?.[0]?.id ?? ""}`);
+  const { mutate: deleteView } = api.view.delete.useMutation({
+    onSuccess: async (deleted) => {
+      await Promise.all([
+        utils.view.list.invalidate({ tableId }),
+        utils.table.get.invalidate({ tableId }),
+      ]);
+      if (deleted.id === activeViewId) {
+        const next = views?.find((view) => view.id !== deleted.id);
+        if (next) goToView(next.id);
+      }
       toast.success(`View deleted successfully!`);
     },
     onError: (error) => {
-      toast.error(`Failed to delete view: ${error.message}`);
+      toast.error(error.message);
     }
   })
- 
-  const handleViewClick = (viewId: string) => {
-    handleViewChange?.(viewId);
-  }
 
+  const commitRename = () => {
+    const name = editName.trim();
+    const current = views?.find((view) => view.id === editingViewId);
+    if (editingViewId && name !== "" && name !== current?.name) {
+      renameView({ viewId: editingViewId, name });
+    }
+    setEditingViewId(null);
+    setEditName("");
+  };
 
+  const handleCreate = (e: React.FormEvent) => {
+    e.preventDefault();
+    createView({ tableId, name: viewName.trim() || undefined });
+  };
 
   return (
     <div className="flex overflow-hidden">
@@ -152,17 +126,17 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                 <ContextMenu>
                   <ContextMenuTrigger className="cursor-pointer flex items-center w-full">
                         <Button variant="ghost" className={`cursor-pointer w-full justify-start gap-x-2 ${view.id === activeViewId ? 'bg-blue-50' : ''} hover:bg-blue-100`}
-                          onClick={() => handleViewClick(view.id)}>
+                          onClick={() => goToView(view.id)}>
                           <TableCellsSplit className="h-4 w-4 font-light text-blue-600" />  
-                              {isEditing && view.id === activeViewId ? <form onSubmit={handleSubmit}>
-                                  <Input value={editName || viewName} onChange={(e) => setEditName(e.target.value)} onBlur={() => setIsEditing(false)}></Input>
-                                </form> : <span key={view.id} className="text-sm">{view.name}</span>}
+                              {editingViewId === view.id ? <form onSubmit={(e) => { e.preventDefault(); commitRename(); }}>
+                                  <Input autoFocus value={editName} onChange={(e) => setEditName(e.target.value)} onBlur={commitRename} onClick={(e) => e.stopPropagation()}></Input>
+                                </form> : <span className="text-sm">{view.name}</span>}
                           {view.id === activeViewId && <Check className="ml-auto h-4 w-4 text-gray-600" />}
                         </Button>
                     </ContextMenuTrigger>
                     <ContextMenuContent className="w-48">
-                      <ContextMenuItem onClick={() => setIsEditing(true)}>Rename view</ContextMenuItem>
-                      <ContextMenuItem disabled={views.length === 1}onClick={() => deleteView({id: view.id})}>Delete view</ContextMenuItem>
+                      <ContextMenuItem onClick={() => { setEditName(view.name); setEditingViewId(view.id); }}>Rename view</ContextMenuItem>
+                      <ContextMenuItem disabled={views.length <= 1} onClick={() => deleteView({ viewId: view.id })}>Delete view</ContextMenuItem>
                     </ContextMenuContent>
                   </ContextMenu>
                 
@@ -177,24 +151,26 @@ export default function TableSidebar({ baseId, tableId, filters, sort, activeVie
                     <TableCellsSplit className="h-4 w-4 text-blue-600" />
                     <span className="text-sm">Grid</span>
                   </div>
-                  <Popover>
+                  <Popover open={createOpen} onOpenChange={setCreateOpen}>
                     <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100">
+                      <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100" aria-label="Create grid view">
                         <Plus className="h-4 w-4" />
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-64 p-4">
-                      <div className="mb-4">
-                        <Input placeholder="Enter view name" className="w-full" onChange={(e) => setViewName(e.target.value)}/>
-                      </div>
-                      <div className="flex flex-2 gap-x-2">
-                        <Button variant="ghost">
-                          Cancel
-                        </Button>
-                        <Button variant="default" className="bg-blue-400 text-white" onClick={handleSubmit}>
-                          Create new view
-                        </Button>
-                      </div>
+                      <form onSubmit={handleCreate}>
+                        <div className="mb-4">
+                          <Input placeholder="Enter view name" className="w-full" value={viewName} onChange={(e) => setViewName(e.target.value)}/>
+                        </div>
+                        <div className="flex flex-2 gap-x-2">
+                          <Button type="button" variant="ghost" onClick={() => setCreateOpen(false)}>
+                            Cancel
+                          </Button>
+                          <Button type="submit" variant="default" className="bg-blue-400 text-white">
+                            Create new view
+                          </Button>
+                        </div>
+                      </form>
                     </PopoverContent>
                   </Popover>
                   

@@ -4,107 +4,76 @@ import { Button } from "~/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuPortal,
   DropdownMenuSeparator,
-  DropdownMenuShortcut,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu"
 import { api } from "~/trpc/react";
 import { Ellipsis } from "lucide-react";
-import { set } from "zod";
+import { toast } from "sonner";
 import Link from "next/link";
 
 
-export const getLastVisitedTable = (baseId: string): string | null => {
-  if (typeof window === 'undefined') return null;
-  return localStorage.getItem(`lastTable-${baseId}`);
+type BaseCardProps = {
+    baseId: string;
+    baseName: string;
+    firstTableId: string | null;
+    firstViewId: string | null;
 };
 
-export const setLastVisitedTable = (baseId: string, tableId: string): void => {
-  if (typeof window === 'undefined') return;
-  localStorage.setItem(`lastTable-${baseId}`, tableId);
-};
-
-
-export function BaseCard({ baseId, baseName }: { baseId: string; baseName: string}) {
+export function BaseCard({ baseId, baseName, firstTableId, firstViewId }: BaseCardProps) {
     const [newName, setNewName] = useState(baseName);
     const [isEditing, setIsEditing] = useState(false);
     const [isOpen, setIsOpen] = useState(false);
     const utils = api.useUtils();
     const inputRef = useRef<HTMLInputElement>(null);
-    const [defaultTable, setDefaultTable] = useState("");
-    const { data: tables, isLoading } = api.table.getTables.useQuery({ baseId });
-    useEffect(() => {
-        if (tables && tables.length > 0) {
-            setDefaultTable(tables[0]!.id);
-    }
-    }, [tables]);
     useEffect(() => {
     if (isEditing && inputRef.current) {
         inputRef.current.focus();
         }
     }, [isEditing]);
-    const { mutate: updateBase } = api.base.updateBase.useMutation({
+    const { mutate: renameBase } = api.base.rename.useMutation({
         onSuccess: () => {
-            void utils.base.getBases.invalidate();
+            void utils.base.list.invalidate();
         },
         onError: (error) => {
-            console.error("Error updating base:", error);
+            toast.error(error.message);
         }
     });
-    const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
-        setIsOpen(false);
-        e.preventDefault();
-        if (newName !== baseName) {
-            void updateBase({baseId, name: newName});
-        }
-    }
-    console.log("BaseCard render", { baseId, defaultTable, baseName });
-    const { mutate: deleteBase } = api.base.deleteBase.useMutation({
+    const { mutate: deleteBase } = api.base.delete.useMutation({
         onSuccess: () => {
-            void utils.base.getBases.invalidate();
+            void utils.base.list.invalidate();
         },
         onError: (error) => {
-            console.error("Error deleting base:", error);
+            toast.error(error.message);
         }
     });
-    const handleDelete = () => {
-        void deleteBase({baseId});
-    }
-    const handleDropdownOpen = (open: boolean) => {
-        if (!open) {
-            if (newName !== baseName) {
-                console.log("Updating base name to:", newName);
-                void updateBase({baseId, name: newName});
-            }
-            setIsEditing(false);
+
+    const commitName = () => {
+        const name = newName.trim();
+        setIsEditing(false);
+        if (name !== "" && name !== baseName) {
+            renameBase({ baseId, name });
+        } else {
             setNewName(baseName);
         }
-        setIsOpen(open);
+    };
+    const handleUpdate = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        commitName();
+    }
+    const handleDelete = () => {
+        deleteBase({ baseId });
     }
 
-    useEffect(() => {
-        if (tables && tables.length > 0) {
-            const lastVisited = getLastVisitedTable(baseId);
-            if (lastVisited) {
-                setDefaultTable(lastVisited);
-            }
-            else {
-                setDefaultTable(tables[0]!.id);
-            }
-        }
-    }, [tables, baseId]);
+    const href = firstTableId
+        ? `/${baseId}/${firstTableId}${firstViewId ? `?viewId=${firstViewId}` : ""}`
+        : `/${baseId}`;
 
     return (
         <div className="relative group bg-white shadow-2xs border rounded-md p-5 my-5 flex items-center hover:shadow-lg transition-shadow duration-200">
             {!isEditing && (
-            <Link href={`/${baseId}/${defaultTable}`} className="absolute inset-0" />
+            <Link href={href} className="absolute inset-0" />
             )
             }
             
@@ -118,17 +87,9 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
                         <input
                             type="text"
                             value={newName}
-                            onChange={(e) => {
-                                setNewName(e.target.value);
-                                console.log(newName);
-                            }}
-                            onBlur={() => {
-                                if (newName !== baseName) {
-                                    updateBase({ baseId, name: newName });
-                                }
-                                console.log("this is true");
-                                setIsEditing(false);
-                            }}
+                            ref={inputRef}
+                            onChange={(e) => setNewName(e.target.value)}
+                            onBlur={commitName}
                             className="border border-blue-400 rounded-md p-1 text-sm font-semibold w-full"
                             autoFocus
                         />
@@ -138,7 +99,7 @@ export function BaseCard({ baseId, baseName }: { baseId: string; baseName: strin
                 )}
                 <p className="text-xs font-semibold text-gray-500">Base</p>
             </div>
-            <DropdownMenu open={isOpen} onOpenChange={handleDropdownOpen}>
+            <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
                 <DropdownMenuTrigger asChild>
                     <Ellipsis className="absolute top-6 text-gray-400 right-4 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </DropdownMenuTrigger>
