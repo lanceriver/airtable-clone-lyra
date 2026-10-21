@@ -16,6 +16,14 @@ export type GridRowProps = {
   width: number;
   /** Lower-cased search text, or "". */
   searchLower: string;
+  /**
+   * The id of the selected column when this is the selected row, else null.
+   * Only the old and the new selected row get a different value, so only
+   * they re-render when the selection moves.
+   */
+  activeColumnId: string | null;
+  /** The selected cell of this row is being edited. */
+  editing: boolean;
 };
 
 /**
@@ -30,14 +38,17 @@ export const GridRow = memo(function GridRow({
   columns,
   width,
   searchLower,
+  activeColumnId,
+  editing,
 }: GridRowProps) {
   const loaded = row !== undefined;
+  const isActiveRow = activeColumnId !== null;
   return (
     <div
       role="row"
       aria-rowindex={index + 2}
       data-row-index={index}
-      className="absolute left-0 top-0 flex"
+      className="absolute top-0 left-0 flex"
       style={{
         width,
         height: ROW_HEIGHT,
@@ -46,7 +57,9 @@ export const GridRow = memo(function GridRow({
     >
       <div
         role="rowheader"
-        className={`sticky left-0 z-10 box-border flex h-8 flex-none items-center border-b border-r border-[#dfe2e4] bg-white px-2 text-left text-[12px] text-[#666]`}
+        className={`sticky left-0 z-10 box-border flex h-8 flex-none items-center border-r border-b border-[#dfe2e4] px-2 text-left text-[12px] ${
+          isActiveRow ? "bg-[#eceef0] text-[#1d1f25]" : "bg-white text-[#666]"
+        }`}
         style={{ width: ROW_NUMBER_WIDTH }}
       >
         {index + 1}
@@ -60,6 +73,8 @@ export const GridRow = memo(function GridRow({
           searchLower={searchLower}
           rowIndex={index}
           columnIndex={columnIndex}
+          isActive={column.id === activeColumnId}
+          isEditing={editing && column.id === activeColumnId}
         />
       ))}
     </div>

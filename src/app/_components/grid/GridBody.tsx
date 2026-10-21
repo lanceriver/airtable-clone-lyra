@@ -26,6 +26,10 @@ type GridBodyProps = {
   width: number;
   getRow: (index: number) => RowRecord | undefined;
   searchLower: string;
+  /** The selected cell, if any, and whether it is being edited. */
+  activeRow: number | null;
+  activeColumnId: string | null;
+  editing: boolean;
 };
 
 /**
@@ -42,6 +46,9 @@ export function GridBody({
   width,
   getRow,
   searchLower,
+  activeRow,
+  activeColumnId,
+  editing,
 }: GridBodyProps) {
   if (virtualItems === undefined) {
     // First load: header is already there, rows shimmer.
@@ -62,6 +69,8 @@ export function GridBody({
             columns={columns}
             width={width}
             searchLower=""
+            activeColumnId={null}
+            editing={false}
           />
         ))}
       </div>
@@ -76,7 +85,7 @@ export function GridBody({
       style={{ width, height: spacerHeight }}
     >
       <div
-        className="absolute left-0 top-0 w-full will-change-transform"
+        className="absolute top-0 left-0 w-full will-change-transform"
         style={{
           transform: `translateY(${anchorIndex * ROW_HEIGHT + layerShift}px)`,
         }}
@@ -90,6 +99,8 @@ export function GridBody({
             columns={columns}
             width={width}
             searchLower={searchLower}
+            activeColumnId={item.index === activeRow ? activeColumnId : null}
+            editing={item.index === activeRow && editing}
           />
         ))}
       </div>

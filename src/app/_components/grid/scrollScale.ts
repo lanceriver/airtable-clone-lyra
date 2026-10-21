@@ -117,7 +117,110 @@ export function toScrollTop(scale: ScrollScale, virtualOffset: number): number {
  * `i * rowHeight - virtualOffset` in the viewport. Rows are then pixel-exact
  * wherever the scrollbar is. Zero when not scaled.
  */
-export function rowLayerShift(scale: ScrollScale, virtualOffset: number): number {
+export function rowLayerShift(
+  scale: ScrollScale,
+  virtualOffset: number,
+): number {
   if (!scale.scaled) return 0;
   return Math.round(toScrollTop(scale, virtualOffset) - virtualOffset);
+}
+
+/**
+ * The `scrollTop` that brings row `rowIndex` fully into view with the least
+ * movement, or `scrollTop` itself when it already is. The sticky header is
+ * not part of the row area (`scale.viewportHeight` excludes it), so a row
+ * "just under the header" is at virtual offset `rowIndex * rowHeight`.
+ *
+ * When scaled, one real pixel is `ratio` virtual px. The result is rounded
+ * toward the row's side of the viewport so that the row ends up whole, not
+ * clipped by the rounding.
+ */
+export function scrollTopToRevealRow(
+  scale: ScrollScale,
+  scrollTop: number,
+  rowIndex: number,
+  rowHeight: number,
+): number {
+  const offset = toVirtualOffset(scale, scrollTop);
+  const top = rowIndex * rowHeight;
+  const bottom = top + rowHeight;
+  if (top < offset) {
+    return Math.max(0, Math.floor(toScrollTop(scale, top)));
+  }
+  if (bottom > offset + scale.viewportHeight) {
+    return Math.min(
+      maxScrollTop(scale),
+      Math.ceil(toScrollTop(scale, bottom - scale.viewportHeight)),
+    );
+  }
+  return scrollTop;
+}
+
+export type ColumnReveal = {
+  /** Left edge of the cell inside the scrolling content. */
+  cellLeft: number;
+  cellWidth: number;
+  /** Width of the sticky row-number and primary columns; they cover cells. */
+  stickyWidth: number;
+  scrollLeft: number;
+  /** Visible width of the scroll container (without its scrollbar). */
+  clientWidth: number;
+};
+
+/**
+ * The `scrollLeft` that brings a cell fully into view, counting what the
+ * sticky columns cover as hidden, or `scrollLeft` itself when it is already
+ * visible. A cell wider than the room left shows its left edge.
+ */
+export function scrollLeftToRevealColumn({
+  cellLeft,
+  cellWidth,
+  stickyWidth,
+  scrollLeft,
+  clientWidth,
+}: ColumnReveal): number {
+  if (cellLeft < scrollLeft + stickyWidth) {
+    return Math.max(0, cellLeft - stickyWidth);
+  }
+  if (cellLeft + cellWidth > scrollLeft + clientWidth) {
+    return Math.max(
+      0,
+      Math.min(cellLeft - stickyWidth, cellLeft + cellWidth - clientWidth),
+    );
+  }
+  return scrollLeft;
+}
+
+/** Pixels per line / per page for `WheelEvent.deltaMode` 1 and 2. */
+export const WHEEL_LINE_PX = 32;
+
+/** `WheelEvent.deltaY` (or deltaX) in pixels, whatever its `deltaMode`. */
+export function wheelDeltaToPixels(
+  delta: number,
+  deltaMode: number,
+  pageHeight: number,
+): number {
+  if (deltaMode === 1) return delta * WHEEL_LINE_PX;
+  if (deltaMode === 2) return delta * pageHeight;
+  return delta;
+}
+
+/**
+ * Wheel scrolling for a scaled table. One real scroll pixel moves the rows by
+ * `ratio` pixels, so a wheel delta of `deltaPx` is divided by `ratio` to move
+ * the rows by about `deltaPx`. `scrollTop` takes whole pixels, so the
+ * fractional part is carried in `remainder` to the next event: a slow
+ * trackpad gesture of many tiny deltas still scrolls.
+ *
+ * Returns the whole number of pixels to add to `scrollTop` and the new
+ * remainder (always in (-1, 1)).
+ */
+export function accumulateScaledWheel(
+  remainder: number,
+  deltaPx: number,
+  ratio: number,
+): { scrollBy: number; remainder: number } {
+  const exact = remainder + deltaPx / Math.max(1, ratio);
+  const scrollBy = Math.trunc(exact);
+  return { scrollBy, remainder: exact - scrollBy };
 }

@@ -7,7 +7,15 @@ import {
   type ColumnSizingState,
   type VisibilityState,
 } from "@tanstack/react-table";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent,
+} from "react";
 
 import type { RowRecord, ViewSort } from "~/server/db/rows";
 import { GridBody } from "./GridBody";
@@ -24,8 +32,18 @@ import {
   ROW_OVERSCAN,
   SCROLL_CAP,
 } from "./gridConstants";
+import {
+  GridSelectionContext,
+  useGridState,
+  type GridSelectionValue,
+} from "./gridSelection";
 import type { GridColumn, GridField } from "./gridTypes";
-import { rowLayerShift } from "./scrollScale";
+import {
+  rowLayerShift,
+  scrollLeftToRevealColumn,
+  scrollTopToRevealRow,
+} from "./scrollScale";
+import { useGridKeyboard } from "./useGridKeyboard";
 import type { RowPages } from "./useRowPages";
 import { useScaledVirtualizer } from "./useScaledVirtualizer";
 
@@ -46,6 +64,11 @@ export type GridProps = {
    * filters and sort, as a string).
    */
   scrollResetKey: string;
+  /**
+   * Delete / Backspace on the selected cell. The editing task implements the
+   * clearing; the grid only reports which cell.
+   */
+  onClearCell?: (rowIndex: number, columnId: string) => void;
 };
 
 const NO_ROWS: RowRecord[] = [];
@@ -64,6 +87,7 @@ export function Grid({
   search,
   rowPages,
   scrollResetKey,
+  onClearCell,
 }: GridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -152,6 +176,147 @@ export function Grid({
     scrollRef.current?.scrollTo({ top: 0 });
   }, [total, scrollResetKey]);
 
+  // -- Selection and keyboard ---------------------------------------------------
+  const rowCount = total ?? 0;
+  const colCount = columns.length;
+  const [selection, dispatch] = useGridState(rowCount, colCount);
+  const { active, editing } = selection;
+
+  // Filtering, searching or hiding fields can leave the cell outside the table.
+  useEffect(() => {
+    dispatch({ type: "clamp" });
+  }, [dispatch, rowCount, colCount]);
+  // A different result set (the page cache is rebuilt) or table: the row
+  // indexes mean something else now.
+  useEffect(() => {
+    dispatch({ type: "clear" });
+  }, [dispatch, tableId, scrollResetKey, search]);
+
+  const canEdit = useCallback(
+    (rowIndex: number) => getRow(rowIndex) !== undefined,
+    [getRow],
+  );
+  const clearCell = useCallback(
+    (rowIndex: number, col: number) => {
+      const columnId = columns[col]?.id;
+      if (columnId !== undefined) onClearCell?.(rowIndex, columnId);
+    },
+    [columns, onClearCell],
+  );
+  const onKeyDown = useGridKeyboard({
+    state: selection,
+    dispatch,
+    canEdit,
+    clearCell,
+  });
+
+  // Click selects, double-click edits. Delegated: cells have no handlers.
+  const cellAt = (target: EventTarget): { row: number; col: number } | null => {
+    if (!(target instanceof Element)) return null;
+    const rowElement = target.closest<HTMLElement>("[data-row-index]");
+    if (!rowElement) return null;
+    const row = Number(rowElement.dataset.rowIndex);
+    const cell = target.closest<HTMLElement>("[data-col-index]");
+    if (cell) return { row, col: Number(cell.dataset.colIndex) };
+    // The row number selects the row's first field.
+    return target.closest('[role="rowheader"]') ? { row, col: 0 } : null;
+  };
+  const onMouseDown = (event: MouseEvent<HTMLDivElement>) => {
+    if (event.button !== 0) return;
+    const cell = cellAt(event.target);
+    if (cell) dispatch({ type: "select", ...cell });
+  };
+  const onDoubleClick = (event: MouseEvent<HTMLDivElement>) => {
+    const cell = cellAt(event.target);
+    if (!cell) return;
+    dispatch({ type: "select", ...cell });
+    if (canEdit(cell.row)) dispatch({ type: "startEdit" });
+  };
+
+  // Clicking outside the grid finishes an edit (and keeps the selection).
+  useEffect(() => {
+    if (!editing) return;
+    const onOutsideMouseDown = (event: globalThis.MouseEvent) => {
+      const scroller = scrollRef.current;
+      if (
+        scroller &&
+        event.target instanceof Node &&
+        !scroller.contains(event.target)
+      ) {
+        dispatch({ type: "commitEdit", move: null });
+      }
+    };
+    document.addEventListener("mousedown", onOutsideMouseDown);
+    return () => document.removeEventListener("mousedown", onOutsideMouseDown);
+  }, [editing, dispatch]);
+
+  // Scroll the selected cell into view whenever it changes.
+  const latest = useRef({ columns, scale });
+  useLayoutEffect(() => {
+    latest.current = { columns, scale };
+  });
+  const previousCol = useRef<number | null>(null);
+  const activeRow = active?.row ?? null;
+  const activeCol = active?.col ?? null;
+  useLayoutEffect(() => {
+    const element = scrollRef.current;
+    const columnChanged = previousCol.current !== activeCol;
+    previousCol.current = activeCol;
+    if (!element || activeRow === null || activeCol === null) return;
+    const { columns: cols, scale: currentScale } = latest.current;
+    const top = scrollTopToRevealRow(
+      currentScale,
+      element.scrollTop,
+      activeRow,
+      ROW_HEIGHT,
+    );
+    let left = element.scrollLeft;
+    const column = cols[activeCol];
+    if (column && activeCol === 0) {
+      // The primary column is sticky; going back to it (Home, Tab wrapping)
+      // brings the row's start back into view.
+      if (columnChanged) left = 0;
+    } else if (column) {
+      const cellLeft =
+        ROW_NUMBER_WIDTH +
+        cols.slice(0, activeCol).reduce((sum, c) => sum + c.width, 0);
+      left = scrollLeftToRevealColumn({
+        cellLeft,
+        cellWidth: column.width,
+        stickyWidth: ROW_NUMBER_WIDTH + (cols[0]?.width ?? 0),
+        scrollLeft: element.scrollLeft,
+        clientWidth: element.clientWidth,
+      });
+    }
+    if (top !== element.scrollTop || left !== element.scrollLeft) {
+      element.scrollTo({ top, left });
+    }
+  }, [activeRow, activeCol]);
+
+  const activeColumn = activeCol === null ? null : (columns[activeCol] ?? null);
+  const selectionValue = useMemo<GridSelectionValue>(
+    () => ({
+      state: selection,
+      dispatch,
+      rowCount,
+      colCount,
+      columns,
+      activeColumn,
+      scrollerRef: scrollRef,
+      focusGrid: () => scrollRef.current?.focus({ preventScroll: true }),
+      clearCell: (rowIndex, columnId) => onClearCell?.(rowIndex, columnId),
+    }),
+    [
+      selection,
+      dispatch,
+      rowCount,
+      colCount,
+      columns,
+      activeColumn,
+      onClearCell,
+    ],
+  );
+
   const virtualOffset = virtualizer.scrollOffset ?? 0;
   const firstItem = virtualItems?.[0];
   const anchorIndex = firstItem
@@ -161,36 +326,45 @@ export function Grid({
   const searchLower = search.toLowerCase();
 
   return (
-    <div
-      ref={scrollRef}
-      role="grid"
-      aria-rowcount={(total ?? 0) + 1}
-      aria-colcount={columns.length + 1}
-      data-testid="grid-scroller"
-      data-hscrolled="false"
-      className="group/grid relative h-full w-full overflow-auto bg-white text-[13px] leading-[18px] text-[#1d1f25]"
-      style={{ overscrollBehavior: "contain" }}
-      onScroll={(event) => {
-        // A data attribute drives the divider on the primary column with CSS,
-        // so horizontal scrolling doesn't re-render any row.
-        const element = event.currentTarget;
-        const scrolled = element.scrollLeft > 0 ? "true" : "false";
-        if (element.dataset.hscrolled !== scrolled) {
-          element.dataset.hscrolled = scrolled;
-        }
-      }}
-    >
-      <GridHeader tableId={tableId} columns={columns} width={rowWidth} />
-      <GridBody
-        virtualItems={virtualItems}
-        spacerHeight={scale.spacerHeight}
-        anchorIndex={anchorIndex}
-        layerShift={rowLayerShift(scale, virtualOffset)}
-        columns={columns}
-        width={rowWidth}
-        getRow={getRow}
-        searchLower={searchLower}
-      />
-    </div>
+    <GridSelectionContext.Provider value={selectionValue}>
+      <div
+        ref={scrollRef}
+        role="grid"
+        tabIndex={0}
+        onKeyDown={onKeyDown}
+        onMouseDown={onMouseDown}
+        onDoubleClick={onDoubleClick}
+        aria-rowcount={(total ?? 0) + 1}
+        aria-colcount={columns.length + 1}
+        data-testid="grid-scroller"
+        data-hscrolled="false"
+        className="group/grid relative h-full w-full overflow-auto bg-white text-[13px] leading-[18px] text-[#1d1f25] outline-none select-none"
+        style={{ overscrollBehavior: "contain" }}
+        onScroll={(event) => {
+          // A data attribute drives the divider on the primary column with CSS,
+          // so horizontal scrolling doesn't re-render any row.
+          const element = event.currentTarget;
+          const scrolled = element.scrollLeft > 0 ? "true" : "false";
+          if (element.dataset.hscrolled !== scrolled) {
+            element.dataset.hscrolled = scrolled;
+          }
+        }}
+      >
+        <GridHeader tableId={tableId} columns={columns} width={rowWidth} />
+        <GridBody
+          virtualItems={virtualItems}
+          spacerHeight={scale.spacerHeight}
+          anchorIndex={anchorIndex}
+          layerShift={rowLayerShift(scale, virtualOffset)}
+          columns={columns}
+          width={rowWidth}
+          getRow={getRow}
+          searchLower={searchLower}
+          activeRow={activeRow}
+          activeColumnId={activeColumn?.id ?? null}
+          editing={editing}
+        />
+      </div>
+    </GridSelectionContext.Provider>
   );
 }

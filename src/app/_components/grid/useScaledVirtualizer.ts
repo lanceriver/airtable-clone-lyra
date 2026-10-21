@@ -7,6 +7,7 @@ import {
 } from "@tanstack/react-virtual";
 import {
   useCallback,
+  useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -14,7 +15,14 @@ import {
   type RefObject,
 } from "react";
 
-import { computeScale, toScrollTop, toVirtualOffset, type ScrollScale } from "./scrollScale";
+import {
+  accumulateScaledWheel,
+  computeScale,
+  toScrollTop,
+  toVirtualOffset,
+  wheelDeltaToPixels,
+  type ScrollScale,
+} from "./scrollScale";
 
 type Options = {
   scrollRef: RefObject<HTMLDivElement | null>;
@@ -70,7 +78,9 @@ export function useScaledVirtualizer({
     scaleRef.current = scale;
   }, [scale]);
 
-  const reportOffset = useRef<((offset: number, isScrolling: boolean) => void) | null>(null);
+  const reportOffset = useRef<
+    ((offset: number, isScrolling: boolean) => void) | null
+  >(null);
 
   const observeOffset = useCallback(
     (
@@ -121,5 +131,50 @@ export function useScaledVirtualizer({
     reportOffset.current(toVirtualOffset(scale, element.scrollTop), false);
   }, [scale, scrollRef]);
 
+  useScaledWheel(scrollRef, scale);
+
   return { virtualizer, scale };
+}
+
+/**
+ * Wheel scrolling at the pace of the rows. Scrolled natively, a scaled table
+ * moves `ratio` times faster than the wheel (a wheel pixel is a scroll pixel,
+ * and a scroll pixel is `ratio` virtual pixels). So when scaled, vertical
+ * wheel events are taken over: `scrollTop += delta / ratio`, carrying the
+ * fraction between events. Horizontal gestures stay with the browser.
+ */
+function useScaledWheel(
+  scrollRef: RefObject<HTMLDivElement | null>,
+  { scaled, ratio }: ScrollScale,
+) {
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element || !scaled) return;
+    let remainder = 0;
+    const onWheel = (event: WheelEvent) => {
+      // Zoom (ctrl+wheel), shift+wheel (horizontal) and sideways swipes.
+      if (event.ctrlKey || event.shiftKey || event.deltaY === 0) return;
+      if (Math.abs(event.deltaX) > Math.abs(event.deltaY)) return;
+      // Cancelling the event cancels its horizontal part too: redo that here.
+      event.preventDefault();
+      const page = element.clientHeight;
+      const step = accumulateScaledWheel(
+        remainder,
+        wheelDeltaToPixels(event.deltaY, event.deltaMode, page),
+        ratio,
+      );
+      remainder = step.remainder;
+      element.scrollTop += step.scrollBy;
+      if (event.deltaX !== 0) {
+        element.scrollLeft += wheelDeltaToPixels(
+          event.deltaX,
+          event.deltaMode,
+          element.clientWidth,
+        );
+      }
+    };
+    // Not passive: it has to cancel the browser's own scrolling.
+    element.addEventListener("wheel", onWheel, { passive: false });
+    return () => element.removeEventListener("wheel", onWheel);
+  }, [scrollRef, scaled, ratio]);
 }
