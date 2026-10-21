@@ -12,7 +12,6 @@ import {
   Share2,
   X,
 } from "lucide-react"
-import { toast } from "sonner"
 import { Button } from "~/components/ui/button"
 import { Input } from "~/components/ui/input"
 import { Separator } from "~/components/ui/separator"
@@ -23,13 +22,15 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "~/components/ui/popover"
-import { api, type RouterOutputs } from "~/trpc/react"
+import type { RouterOutputs } from "~/trpc/react"
 import type { ColumnType, ViewFilter, ViewSort } from "~/server/db/rows"
 import type { ViewConfigPatch } from "../useUpdateViewConfig"
 import TableSidebar from "./TableSidebar"
 import { FilterPopover, type AddFilterRequest } from "./FilterPopover"
 import { SortPopover } from "./SortPopover"
 import { HideFieldsPopover } from "./HideFieldsPopover"
+import { FetchProgressBar } from "../toolbar/FetchProgressBar"
+import { useAddFakeRows } from "../toolbar/useAddFakeRows"
 
 export type ToolbarColumn = { id: string; name: string; type: ColumnType };
 
@@ -47,6 +48,10 @@ type NavbarProps = {
   searchInput: string;
   onSearchChange: (search: string) => void;
   recordCount?: { count: number; total: number };
+  /** Hides the record count (the grid footer shows it instead). */
+  hideRecordCount?: boolean;
+  /** Shows the thin progress bar under the toolbar while rows are loading. */
+  isFetching?: boolean;
   /** Called after "Add 100k rows" succeeds, for the grid to reload its rows. */
   onRowsAdded?: () => void;
   /** Adds a filter on a field and opens the filter popover (field menu). */
@@ -61,32 +66,33 @@ function formatRecordCount({ count, total }: { count: number; total: number }) {
     : `${format(count)} of ${format(total)} records`;
 }
 
-export default function TableNavbar2({ baseId, tableId, viewId, viewName, columns, config, displaySort, isSortPending, onUpdateConfig, searchInput, onSearchChange, recordCount, onRowsAdded, addFilterRequest, children }: NavbarProps ) {
-  const utils = api.useUtils();
-
-  const { mutateAsync: addFakeRows, isPending: is100KPending } = api.row.addFakeRows.useMutation({
-    onSuccess: () => {
-      void utils.row.getRows.invalidate();
-      void utils.row.countRows.invalidate();
-      onRowsAdded?.();
-    },
-  });
-
-  const handleAdd100kRows = () => {
-    toast.promise(addFakeRows({ tableId, count: 100000 }), {
-      loading: "100k rows are currently being added. Please be patient!",
-      success: "100k rows created successfully!",
-      error: (error: unknown) =>
-        error instanceof Error ? error.message : "Error creating rows. Please try again later.",
-    });
-  };
+export default function TableNavbar2({
+  baseId,
+  tableId,
+  viewId,
+  viewName,
+  columns,
+  config,
+  displaySort,
+  isSortPending,
+  onUpdateConfig,
+  searchInput,
+  onSearchChange,
+  recordCount,
+  hideRecordCount = false,
+  isFetching = false,
+  onRowsAdded,
+  addFilterRequest,
+  children,
+}: NavbarProps) {
+  const addRows = useAddFakeRows({ tableId, onRowsAdded });
 
   const handleFiltersChange = (filters: ViewFilter[]) => onUpdateConfig({ filters });
 
   return (
     <div className="flex flex-col h-screen">
       {/* Secondary navigation */}
-      <div className="flex items-center border-b px-2 py-1.5">
+      <div className="relative flex items-center border-b px-2 py-1.5">
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger asChild>
@@ -167,14 +173,15 @@ export default function TableNavbar2({ baseId, tableId, viewId, viewName, column
           variant="ghost"
           size="sm"
           className="cursor-pointer h-8 gap-1"
-          disabled={is100KPending}
-          onClick={handleAdd100kRows}
+          disabled={addRows.isPending}
+          onClick={addRows.add}
         >
-        {!is100KPending && <span className="font-normal">Add 100k rows</span>}
-        {is100KPending && <span className="animate-pulse font-normal">Adding 100k rows...</span>}
+          <span className={`font-normal ${addRows.isPending ? "animate-pulse" : ""}`}>
+            {addRows.isPending ? "Adding 100k rows..." : "Add 100k rows"}
+          </span>
         </Button>
         <div className="ml-auto flex items-center gap-2">
-          {recordCount && (
+          {recordCount && !hideRecordCount && (
             <span className="text-xs text-gray-500" data-testid="record-count">
               {formatRecordCount(recordCount)}
             </span>
@@ -211,8 +218,9 @@ export default function TableNavbar2({ baseId, tableId, viewId, viewName, column
             </PopoverContent>
           </Popover>
         </div>
+        <FetchProgressBar active={isFetching} />
       </div>
-      
+
       <div className="flex w-full overflow-auto">
         {/* Sidebar */}
            <TableSidebar baseId={baseId} tableId={tableId} activeViewId={viewId} />
