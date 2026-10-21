@@ -43,6 +43,21 @@ rebuilding it.
   without the "scrollbar only covers what you've loaded" problem. Airtable
   itself shows a full-size scrollbar.
 
+### Measured after 2.1 (1M rows)
+| Jump | Median |
+|---|---:|
+| Unsorted, offset 500k / 990k | 36 / 71 ms (index-only two-step) |
+| Filtered, offset 250k | 328 ms |
+| Sorted (indexed), offset 500k | 1.43 s (expression indexes can't do index-only scans) |
+
+Consequences for the page cache (2.2):
+- A jump issues **one** offset request; neighbours then chain by keyset from it.
+- **Backward keyset**: each page also returns a `prevCursor` (its first row), and
+  `getRows` accepts `direction: "backward"` so the page *before* a cached page is
+  fetched by reverse keyset (fast) instead of by offset. Scrolling up after a jump
+  never pays the offset cost again.
+- A page whose neighbour is in flight waits for it rather than firing an offset.
+
 ### Very tall tables: scaled scrolling
 1M rows × 32 px is 32M px, which is past Firefox's maximum element height
 (about 17.9M px) and at Chrome's limit (about 33.5M px). When
