@@ -84,6 +84,7 @@ describe("view.list / get", () => {
         sort: { columnId: name.id, direction: "asc" },
         hiddenColumnIds: ["c"],
         search: "hello",
+        columnWidths: {},
       },
     });
     expect((await caller.get({ viewId: base.viewId })).config).toEqual({
@@ -91,6 +92,7 @@ describe("view.list / get", () => {
       sort: null,
       hiddenColumnIds: [],
       search: "",
+      columnWidths: {},
     });
   });
 });
@@ -111,6 +113,7 @@ describe("view.create", () => {
       sort: null,
       hiddenColumnIds: [],
       search: "",
+      columnWidths: {},
     });
   });
 
@@ -192,6 +195,7 @@ describe("view.updateConfig", () => {
       sort: null,
       hiddenColumnIds: [],
       search: "",
+      columnWidths: {},
     });
 
     config = await caller.updateConfig({ viewId: base.viewId, search: "abc" });
@@ -200,6 +204,7 @@ describe("view.updateConfig", () => {
       sort: null,
       hiddenColumnIds: [],
       search: "abc",
+      columnWidths: {},
     });
 
     config = await caller.updateConfig({
@@ -329,6 +334,7 @@ describe("view.updateConfig", () => {
       sort: null,
       hiddenColumnIds: [],
       search: "",
+      columnWidths: {},
     });
     expect(await sortIndexes(base.tableId)).toEqual([]);
   });
@@ -340,6 +346,120 @@ describe("view.updateConfig", () => {
       hiddenColumnIds: [name.id, "nope", email.id, name.id],
     });
     expect(config.hiddenColumnIds).toEqual([name.id, email.id]);
+  });
+});
+
+describe("view.updateConfig columnWidths", () => {
+  it("saves widths, replaces the map and leaves other keys alone", async () => {
+    const { owner, base, name, email } = await setup();
+    const caller = callerFor(owner.user.id);
+    await caller.updateConfig({ viewId: base.viewId, search: "abc" });
+
+    let config = await caller.updateConfig({
+      viewId: base.viewId,
+      columnWidths: { [name.id]: 250, [email.id]: 120 },
+    });
+    expect(config.columnWidths).toEqual({ [name.id]: 250, [email.id]: 120 });
+    expect(config.search).toBe("abc");
+
+    // A later update replaces the whole map.
+    config = await caller.updateConfig({
+      viewId: base.viewId,
+      columnWidths: { [name.id]: 300 },
+    });
+    expect(config.columnWidths).toEqual({ [name.id]: 300 });
+    expect((await caller.get({ viewId: base.viewId })).config.columnWidths).toEqual(
+      { [name.id]: 300 },
+    );
+
+    // Updates without widths keep them.
+    config = await caller.updateConfig({ viewId: base.viewId, search: "" });
+    expect(config.columnWidths).toEqual({ [name.id]: 300 });
+
+    config = await caller.updateConfig({ viewId: base.viewId, columnWidths: {} });
+    expect(config.columnWidths).toEqual({});
+  });
+
+  it("clamps and rounds widths and drops unknown fields", async () => {
+    const { owner, base, name, email, company } = await setup();
+    const config = await callerFor(owner.user.id).updateConfig({
+      viewId: base.viewId,
+      columnWidths: {
+        [name.id]: 40,
+        [email.id]: 5000,
+        [company.id]: 180.6,
+        nope: 200,
+      },
+    });
+    expect(config.columnWidths).toEqual({
+      [name.id]: 100,
+      [email.id]: 800,
+      [company.id]: 181,
+    });
+  });
+
+  it("rejects non-numeric widths and more than 200 entries", async () => {
+    const { owner, base, name } = await setup();
+    const caller = callerFor(owner.user.id);
+    await expectCode(
+      caller.updateConfig({
+        viewId: base.viewId,
+        columnWidths: { [name.id]: "wide" as unknown as number },
+      }),
+      "BAD_REQUEST",
+    );
+    await expectCode(
+      caller.updateConfig({
+        viewId: base.viewId,
+        columnWidths: { [name.id]: Number.POSITIVE_INFINITY },
+      }),
+      "BAD_REQUEST",
+    );
+    const many = Object.fromEntries(
+      Array.from({ length: 201 }, (_, i) => [`c${i}`, 150]),
+    );
+    await expectCode(
+      caller.updateConfig({ viewId: base.viewId, columnWidths: many }),
+      "BAD_REQUEST",
+    );
+    const ok = Object.fromEntries(
+      Array.from({ length: 200 }, (_, i) => [`c${i}`, 150]),
+    );
+    expect(
+      (await caller.updateConfig({ viewId: base.viewId, columnWidths: ok }))
+        .columnWidths,
+    ).toEqual({});
+  });
+
+  it("parses a corrupt stored map defensively", async () => {
+    const { owner, base, name, email } = await setup();
+    const caller = callerFor(owner.user.id);
+    await testDb.view.update({
+      where: { id: base.viewId },
+      data: {
+        columnWidths: { [name.id]: "x", [email.id]: 9999, z: 50.4, n: null },
+      },
+    });
+    expect((await caller.get({ viewId: base.viewId })).config.columnWidths).toEqual(
+      { [email.id]: 800, z: 100 },
+    );
+    for (const bad of [[1, 2], "str", 5, null]) {
+      await testDb.$executeRaw`UPDATE "views" SET "columnWidths" = ${JSON.stringify(bad)}::jsonb WHERE id = ${base.viewId}`;
+      expect(
+        (await caller.get({ viewId: base.viewId })).config.columnWidths,
+      ).toEqual({});
+    }
+  });
+
+  it("is not available for another user's view", async () => {
+    const { other, base, name } = await setup();
+    await expectCode(
+      callerFor(other.user.id).updateConfig({
+        viewId: base.viewId,
+        columnWidths: { [name.id]: 200 },
+      }),
+      "NOT_FOUND",
+    );
   });
 });
 

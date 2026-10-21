@@ -119,16 +119,21 @@ export const columnRouter = createTRPCRouter({
             (id) => id !== column.id,
           );
           const sortCleared = config.sort?.columnId === column.id;
+          const hasWidth = column.id in config.columnWidths;
+          const columnWidths = { ...config.columnWidths };
+          delete columnWidths[column.id];
           const touched =
             filters.length !== config.filters.length ||
             hidden.length !== config.hiddenColumnIds.length ||
-            sortCleared;
+            sortCleared ||
+            hasWidth;
           if (!touched) continue;
           await tx.view.update({
             where: { id: view.id },
             data: {
               filters,
               hiddenColumnIds: hidden,
+              columnWidths,
               ...(sortCleared ? { sort: Prisma.DbNull } : {}),
             },
           });

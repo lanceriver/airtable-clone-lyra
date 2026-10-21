@@ -238,11 +238,13 @@ describe("column.delete", () => {
         ],
         sort: { columnId: email.id, direction: "asc" },
         hiddenColumnIds: [email.id],
+        columnWidths: { [email.id]: 300 },
       },
     });
     await testDb.view.update({
       where: { id: view.id },
       data: {
+        columnWidths: { [name.id]: 220, [email.id]: 140 },
         filters: [
           { id: "f1", columnId: name.id, operator: "contains", value: "a" },
           { id: "f2", columnId: score.id, operator: "gt", value: 5 },
@@ -281,12 +283,14 @@ describe("column.delete", () => {
     ]);
     expect(after.sort).toBeNull();
     expect(after.hiddenColumnIds).toEqual([email.id]);
+    expect(after.columnWidths).toEqual({ [email.id]: 140 });
     const same = await testDb.view.findUniqueOrThrow({
       where: { id: untouched.id },
     });
     expect(same.filters).toEqual(untouched.filters);
     expect(same.sort).toEqual(untouched.sort);
     expect(same.hiddenColumnIds).toEqual([email.id]);
+    expect(same.columnWidths).toEqual({ [email.id]: 300 });
 
     expect(await indexCount(base.tableId, name.id)).toBe(0);
     expect(await indexCount(base.tableId, email.id)).toBe(1);
