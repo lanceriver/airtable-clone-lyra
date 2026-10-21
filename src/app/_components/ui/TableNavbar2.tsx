@@ -47,6 +47,8 @@ type NavbarProps = {
   searchInput: string;
   onSearchChange: (search: string) => void;
   recordCount?: { count: number; total: number };
+  /** Called after "Add 100k rows" succeeds, for the grid to reload its rows. */
+  onRowsAdded?: () => void;
   children: React.ReactNode;
 }
 
@@ -57,13 +59,14 @@ function formatRecordCount({ count, total }: { count: number; total: number }) {
     : `${format(count)} of ${format(total)} records`;
 }
 
-export default function TableNavbar2({ baseId, tableId, viewId, viewName, columns, config, displaySort, isSortPending, onUpdateConfig, searchInput, onSearchChange, recordCount, children }: NavbarProps ) {
+export default function TableNavbar2({ baseId, tableId, viewId, viewName, columns, config, displaySort, isSortPending, onUpdateConfig, searchInput, onSearchChange, recordCount, onRowsAdded, children }: NavbarProps ) {
   const utils = api.useUtils();
 
   const { mutateAsync: addFakeRows, isPending: is100KPending } = api.row.addFakeRows.useMutation({
     onSuccess: () => {
       void utils.row.getRows.invalidate();
       void utils.row.countRows.invalidate();
+      onRowsAdded?.();
     },
   });
 

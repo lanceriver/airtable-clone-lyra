@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useMemo } from "react";
+import { useSearchParams } from "next/navigation";
 import { keepPreviousData } from "@tanstack/react-query";
 import type { ColumnDef, VisibilityState } from "@tanstack/react-table";
 
@@ -12,14 +13,14 @@ import {
 } from "~/app/_components/ui/Table";
 import TableNavbar2 from "~/app/_components/ui/TableNavbar2";
 import { useUpdateViewConfig } from "~/app/_components/useUpdateViewConfig";
-import { useDebouncedValue } from "~/hooks/use-debounced-value";
 import type { RowRecord } from "~/server/db/rows";
 import { api, type RouterOutputs } from "~/trpc/react";
+import { GridWorkspace } from "./GridWorkspace";
+import { useViewSearch } from "./useViewSearch";
 
 const PAGE_SIZE = 200;
-const SEARCH_DEBOUNCE_MS = 300;
 
-type Props = {
+export type WorkspaceProps = {
     baseId: string;
     table: RouterOutputs["table"]["get"];
     view: RouterOutputs["view"]["get"];
@@ -28,23 +29,30 @@ type Props = {
 /**
  * One table view. The parent mounts it with `key={view.id}`, so the search box
  * starts from the view's saved search and nothing leaks between views.
+ *
+ * `?grid=v2` renders the new virtualized grid (src/app/_components/grid);
+ * otherwise the old table. Task 2.9 makes v2 the default and deletes the old
+ * path.
  */
-export function TableWorkspace({ baseId, table, view }: Props) {
+export function TableWorkspace(props: WorkspaceProps) {
+    const useNewGrid = useSearchParams().get("grid") === "v2";
+    return useNewGrid ? (
+        <GridWorkspace {...props} />
+    ) : (
+        <LegacyTableWorkspace {...props} />
+    );
+}
+
+function LegacyTableWorkspace({ baseId, table, view }: WorkspaceProps) {
     const utils = api.useUtils();
     const viewId = view.id;
     const { config } = view;
 
-    const [searchInput, setSearchInput] = useState(config.search);
-    const search = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
-
+    const { searchInput, setSearchInput, search } = useViewSearch(
+        viewId,
+        config.search,
+    );
     const updateConfig = useUpdateViewConfig(viewId);
-    const saveSearch = useUpdateViewConfig(viewId);
-    const savedSearch = useRef(config.search);
-    useEffect(() => {
-        if (search === savedSearch.current) return;
-        savedSearch.current = search;
-        saveSearch.update({ search });
-      }, [search, saveSearch]);
 
     const rowsInput = { viewId, limit: PAGE_SIZE, search };
     const rowsQuery = api.row.getRows.useInfiniteQuery(rowsInput, {
