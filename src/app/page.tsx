@@ -1,6 +1,6 @@
 import { Navbar } from "./_components/ui/Navbar";
 import { HomeDashboard } from "./_components/ui/HomeDashboard";
-import { SignInPage } from "./_components/ui/SignInPage";
+import { SignInPage } from "./_components/auth/SignInPage";
 import SuperJSON from "superjson";
 import { auth } from "~/server/auth";
 import { HydrateClient } from "~/trpc/server";
