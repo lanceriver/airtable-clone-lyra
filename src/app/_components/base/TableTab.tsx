@@ -56,6 +56,7 @@ export function TableTab({
   const inputRef = useRef<HTMLInputElement>(null);
   // Enter, Esc and the blur that follows them must only settle the rename once.
   const settled = useRef(false);
+  const renameRequested = useRef(false);
 
   const canDelete = tables.length > 1;
 
@@ -106,8 +107,12 @@ export function TableTab({
 
   useEffect(() => {
     if (!renaming) return;
-    inputRef.current?.focus();
-    inputRef.current?.select();
+    // Wait a tick: the closing menu's focus trap would otherwise take focus back.
+    const timer = setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [renaming]);
 
   const finishRename = (save: boolean) => {
@@ -174,7 +179,7 @@ export function TableTab({
   return (
     <div
       data-tab-id={table.id}
-      data-active="true"
+      data-tab-active="true"
       className="flex h-8 flex-none items-center rounded-t-[3px] bg-white font-medium"
     >
       {renaming ? (
@@ -202,10 +207,22 @@ export function TableTab({
         <DropdownMenuContent
           align="start"
           className="w-44"
-          // Keep focus off the trigger so the rename input can take it.
-          onCloseAutoFocus={(e) => e.preventDefault()}
+          // Keep focus off the trigger, and start renaming only once the menu
+          // has unmounted: its focus handling would otherwise steal focus back
+          // from the input while it animates out.
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            if (renameRequested.current) {
+              renameRequested.current = false;
+              startRename();
+            }
+          }}
         >
-          <DropdownMenuItem onSelect={startRename}>
+          <DropdownMenuItem
+            onSelect={() => {
+              renameRequested.current = true;
+            }}
+          >
             <Pencil />
             Rename table
           </DropdownMenuItem>
