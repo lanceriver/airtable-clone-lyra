@@ -124,9 +124,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
               hiddenColumnIds={config.hiddenColumnIds}
               sort={config.sort}
               filteredColumnIds={filteredColumnIds}
-              search={search}
               rowPages={rowPages}
-              scrollResetKey={configKey}
               onClearFilters={clearFilters}
             />
           </GridColumnToolsProvider>
