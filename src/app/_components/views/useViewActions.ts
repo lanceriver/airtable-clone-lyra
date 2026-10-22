@@ -5,6 +5,14 @@ import { toast } from "sonner";
 
 import { api } from "~/trpc/react";
 
+/** The next free "Grid N" name ("Grid 2", "Grid 3"...), case-insensitive. */
+export function nextGridName(names: readonly string[]) {
+  const taken = new Set(names.map((name) => name.trim().toLowerCase()));
+  let n = 2;
+  while (taken.has(`grid ${n}`)) n++;
+  return `Grid ${n}`;
+}
+
 /**
  * Create, rename and delete for a table's views, shared by the views sidebar
  * and the toolbar's view menu. Creating a view opens it; deleting the active
@@ -66,6 +74,8 @@ export function useViewActions({
     views,
     /** False for the table's last view, which can't be deleted. */
     canDelete: (views?.length ?? 0) > 1,
+    /** The name to suggest for a new grid view: "Grid 2", "Grid 3"... */
+    nextGridName: nextGridName(views?.map((view) => view.name) ?? []),
     goToView,
     /** Creates a view (the server names it when `name` is empty) and opens it. */
     createView: (name?: string, options?: { onSuccess?: () => void }) => {

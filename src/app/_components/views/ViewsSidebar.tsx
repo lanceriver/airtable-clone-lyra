@@ -1,32 +1,14 @@
 "use client";
 
 import { useState } from "react";
-import {
-  Calendar,
-  LayoutGrid,
-  List,
-  Plus,
-  Search,
-  Check,
-  TableCellsSplit,
-} from "lucide-react";
-import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
-import { Separator } from "~/components/ui/separator";
-import { Collapsible, CollapsibleContent } from "~/components/ui/collapsible";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuTrigger,
-} from "~/components/ui/context-menu";
+import { Search } from "lucide-react";
 
+import { Input } from "~/components/ui/input";
+
+import { CreateGridDialog } from "./CreateGridDialog";
+import { CreateViewMenu } from "./CreateViewMenu";
 import { useViewActions } from "./useViewActions";
+import { ViewListItem } from "./ViewListItem";
 
 export type ViewsSidebarProps = {
   baseId: string;
@@ -39,317 +21,83 @@ export function ViewsSidebar({
   tableId,
   activeViewId,
 }: ViewsSidebarProps) {
-  const [createExpanded, setCreateExpanded] = useState(true);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [viewName, setViewName] = useState("");
-  const [editingViewId, setEditingViewId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
+  const [query, setQuery] = useState("");
+  const [creating, setCreating] = useState(false);
 
-  const { views, goToView, createView, renameView, deleteView } =
-    useViewActions({ baseId, tableId, activeViewId });
+  const {
+    views,
+    canDelete,
+    goToView,
+    createView,
+    isCreating,
+    nextGridName,
+    renameView,
+    deleteView,
+  } = useViewActions({ baseId, tableId, activeViewId });
 
-  const commitRename = () => {
-    if (editingViewId) renameView(editingViewId, editName);
-    setEditingViewId(null);
-    setEditName("");
-  };
-
-  const handleCreate = (e: React.FormEvent) => {
-    e.preventDefault();
-    createView(viewName, {
-      onSuccess: () => {
-        setCreateOpen(false);
-        setViewName("");
-      },
-    });
-  };
+  const needle = query.trim().toLowerCase();
+  const visible = views?.filter((view) =>
+    view.name.toLowerCase().includes(needle),
+  );
 
   return (
-    <aside className="border-at-border flex h-full w-[280px] flex-none flex-col border-r bg-white">
-      <div className="flex min-h-0 flex-1 flex-col">
-        <div className="p-2">
-          <div className="relative mb-2">
-            <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
-            <Input placeholder="Find a view" className="h-9 pl-8 text-sm" />
-          </div>
-          {/* Create section */}
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {views?.map((view) => (
-            <div key={view.id} className="w-full gap-y-0">
-              <ContextMenu>
-                <ContextMenuTrigger className="flex w-full cursor-pointer items-center">
-                  <Button
-                    variant="ghost"
-                    className={`w-full cursor-pointer justify-start gap-x-2 ${view.id === activeViewId ? "bg-blue-50" : ""} hover:bg-blue-100`}
-                    onClick={() => goToView(view.id)}
-                  >
-                    <TableCellsSplit className="h-4 w-4 font-light text-blue-600" />
-                    {editingViewId === view.id ? (
-                      <form
-                        onSubmit={(e) => {
-                          e.preventDefault();
-                          commitRename();
-                        }}
-                      >
-                        <Input
-                          autoFocus
-                          value={editName}
-                          onChange={(e) => setEditName(e.target.value)}
-                          onBlur={commitRename}
-                          onClick={(e) => e.stopPropagation()}
-                        ></Input>
-                      </form>
-                    ) : (
-                      <span className="text-sm">{view.name}</span>
-                    )}
-                    {view.id === activeViewId && (
-                      <Check className="ml-auto h-4 w-4 text-gray-600" />
-                    )}
-                  </Button>
-                </ContextMenuTrigger>
-                <ContextMenuContent className="w-48">
-                  <ContextMenuItem
-                    onClick={() => {
-                      setEditName(view.name);
-                      setEditingViewId(view.id);
-                    }}
-                  >
-                    Rename view
-                  </ContextMenuItem>
-                  <ContextMenuItem
-                    disabled={views.length <= 1}
-                    onClick={() => deleteView(view.id)}
-                  >
-                    Delete view
-                  </ContextMenuItem>
-                </ContextMenuContent>
-              </ContextMenu>
-            </div>
-          ))}
-        </div>
-        <div className="max-h-[45%] flex-none overflow-y-auto">
-          <Collapsible
-            open={createExpanded}
-            onOpenChange={setCreateExpanded}
-            className="border-t pt-4"
-          >
-            <CollapsibleContent className="ml-2 space-y-1">
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <TableCellsSplit className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm">Grid</span>
-                </div>
-                <Popover open={createOpen} onOpenChange={setCreateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      aria-label="Create grid view"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-64 p-4">
-                    <form onSubmit={handleCreate}>
-                      <div className="mb-4">
-                        <Input
-                          placeholder="Enter view name"
-                          className="w-full"
-                          value={viewName}
-                          onChange={(e) => setViewName(e.target.value)}
-                        />
-                      </div>
-                      <div className="flex flex-2 gap-x-2">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          onClick={() => setCreateOpen(false)}
-                        >
-                          Cancel
-                        </Button>
-                        <Button
-                          type="submit"
-                          variant="default"
-                          className="bg-blue-400 text-white"
-                        >
-                          Create new view
-                        </Button>
-                      </div>
-                    </form>
-                  </PopoverContent>
-                </Popover>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4 text-orange-500" />
-                  <span className="text-sm">Calendar</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <LayoutGrid className="h-4 w-4 text-purple-600" />
-                  <span className="text-sm">Gallery</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-4 w-4 items-center justify-center text-green-600">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="9" y1="3" x2="9" y2="21" />
-                      <line x1="15" y1="3" x2="15" y2="21" />
-                    </svg>
-                  </div>
-                  <span className="text-sm">Kanban</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-4 w-4 items-center justify-center text-red-600">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <line x1="3" y1="12" x2="21" y2="12" />
-                      <polyline points="8 7 3 12 8 17" />
-                      <polyline points="16 7 21 12 16 17" />
-                    </svg>
-                  </div>
-                  <span className="text-sm">Timeline</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <List className="h-4 w-4 text-blue-600" />
-                  <span className="text-sm">List</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-4 w-4 items-center justify-center text-green-600">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="3" y="4" width="18" height="16" rx="2" ry="2" />
-                      <line x1="3" y1="10" x2="21" y2="10" />
-                      <line x1="7" y1="4" x2="7" y2="20" />
-                    </svg>
-                  </div>
-                  <span className="text-sm">Gantt</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm">New section</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-
-              <Separator className="my-2" />
-
-              <div className="hover:bg-accent group flex items-center justify-between rounded px-1 py-1.5">
-                <div className="flex items-center gap-2">
-                  <div className="flex h-4 w-4 items-center justify-center text-pink-600">
-                    <svg
-                      viewBox="0 0 24 24"
-                      width="16"
-                      height="16"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                      <line x1="3" y1="9" x2="21" y2="9" />
-                      <line x1="9" y1="21" x2="9" y2="9" />
-                    </svg>
-                  </div>
-                  <span className="text-sm">Form</span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                >
-                  <Plus className="h-4 w-4" />
-                </Button>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
+    <aside
+      aria-label="Views"
+      className="border-at-border flex h-full min-h-0 w-[280px] flex-none flex-col border-r bg-white"
+    >
+      <div className="flex flex-none flex-col gap-2 p-2 pb-1">
+        <CreateViewMenu onCreateGrid={() => setCreating(true)} />
+        <div className="relative">
+          <Search className="text-at-text-muted pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2" />
+          <Input
+            aria-label="Find a view"
+            placeholder="Find a view"
+            className="pl-8"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
         </div>
       </div>
+      <div
+        className="min-h-0 flex-1 overflow-y-auto px-2 py-1"
+        data-testid="view-list"
+      >
+        {!visible ? (
+          <div className="space-y-1" aria-hidden>
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="bg-at-hover h-8 animate-pulse rounded-md"
+              />
+            ))}
+          </div>
+        ) : visible.length === 0 ? (
+          <p className="text-at-text-subtle px-2 py-2 text-[13px]">
+            No views match
+          </p>
+        ) : (
+          visible.map((view) => (
+            <ViewListItem
+              key={view.id}
+              name={view.name}
+              active={view.id === activeViewId}
+              canDelete={canDelete}
+              onSelect={() => goToView(view.id)}
+              onRename={(name) => renameView(view.id, name)}
+              onDelete={() => deleteView(view.id)}
+            />
+          ))
+        )}
+      </div>
+      <CreateGridDialog
+        open={creating}
+        onOpenChange={setCreating}
+        defaultName={nextGridName}
+        isCreating={isCreating}
+        onCreate={(name) =>
+          createView(name, { onSuccess: () => setCreating(false) })
+        }
+      />
     </aside>
   );
 }
