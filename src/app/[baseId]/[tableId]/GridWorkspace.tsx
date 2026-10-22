@@ -10,7 +10,7 @@ import {
 import type { GridField } from "~/app/_components/grid/gridTypes";
 import { useColumnWidths } from "~/app/_components/grid/useColumnWidths";
 import { useRowPages } from "~/app/_components/grid/useRowPages";
-import type { AddFilterRequest } from "~/app/_components/ui/FilterPopover";
+import type { AddFilterRequest } from "~/app/_components/toolbar/FilterPopover";
 import { ViewToolbar } from "~/app/_components/toolbar/ViewToolbar";
 import { ViewsSidebar } from "~/app/_components/views/ViewsSidebar";
 import { useUpdateViewConfig } from "~/app/_components/useUpdateViewConfig";

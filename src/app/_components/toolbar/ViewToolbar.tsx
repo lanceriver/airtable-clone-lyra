@@ -34,9 +34,9 @@ import {
 import type { RouterOutputs } from "~/trpc/react";
 import type { ColumnType, ViewFilter, ViewSort } from "~/server/db/rows";
 import type { ViewConfigPatch } from "../useUpdateViewConfig";
-import { FilterPopover, type AddFilterRequest } from "../ui/FilterPopover";
-import { SortPopover } from "../ui/SortPopover";
-import { HideFieldsPopover } from "../ui/HideFieldsPopover";
+import { FilterPopover, type AddFilterRequest } from "./FilterPopover";
+import { SortPopover } from "./SortPopover";
+import { HideFieldsPopover } from "./HideFieldsPopover";
 import { FetchProgressBar } from "./FetchProgressBar";
 import { useAddFakeRows } from "./useAddFakeRows";
 
