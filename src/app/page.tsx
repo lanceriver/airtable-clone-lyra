@@ -1,5 +1,4 @@
-import { Navbar } from "./_components/ui/Navbar";
-import { HomeDashboard } from "./_components/ui/HomeDashboard";
+import { HomeDashboard } from "./_components/home/HomeDashboard";
 import { SignInPage } from "./_components/auth/SignInPage";
 import SuperJSON from "superjson";
 import { auth } from "~/server/auth";
@@ -7,7 +6,6 @@ import { HydrateClient } from "~/trpc/server";
 import { createServerSideHelpers } from "@trpc/react-query/server";
 import { appRouter } from "~/server/api/root";
 import { db } from "~/server/db";
-import { SidebarProvider } from "~/components/ui/sidebar";
 
 export default async function Home() {
   const session = await auth();
@@ -32,21 +30,16 @@ export default async function Home() {
 
   return (
     <HydrateClient>
-      <SidebarProvider>
-        <main className="flex-1 text-black">
-          {session && (
-            <div className="h-screen overflow-hidden">
-              <Navbar
-                userName={session.user?.name ?? ""}
-                userImage={session.user?.image ?? ""}
-              />
-              <div className="min-h-screen bg-gray-50">
-                <HomeDashboard initialBases={bases} />
-              </div>
-            </div>
-          )}
-        </main>
-      </SidebarProvider>
+      <main className="text-at-text h-screen overflow-hidden">
+        <HomeDashboard
+          initialBases={bases}
+          user={{
+            name: session.user.name ?? "",
+            email: session.user.email,
+            image: session.user.image,
+          }}
+        />
+      </main>
     </HydrateClient>
   );
 }
