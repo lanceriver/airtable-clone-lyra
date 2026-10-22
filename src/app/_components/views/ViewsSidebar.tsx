@@ -29,17 +29,17 @@ import {
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 
-type SidebarProps = {
+export type ViewsSidebarProps = {
   baseId: string;
   tableId: string;
   activeViewId: string;
 };
 
-export default function TableSidebar({
+export function ViewsSidebar({
   baseId,
   tableId,
   activeViewId,
-}: SidebarProps) {
+}: ViewsSidebarProps) {
   const utils = api.useUtils();
   const router = useRouter();
 
@@ -115,8 +115,8 @@ export default function TableSidebar({
   };
 
   return (
-    <div className="flex overflow-hidden">
-      <div className="flex h-screen w-64 flex-col border-r">
+    <aside className="border-at-border flex h-full w-[280px] flex-none flex-col border-r bg-white">
+      <div className="flex min-h-0 flex-1 flex-col">
         <div className="p-2">
           <div className="relative mb-2">
             <Search className="text-muted-foreground absolute top-2.5 left-2.5 h-4 w-4" />
@@ -124,7 +124,7 @@ export default function TableSidebar({
           </div>
           {/* Create section */}
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="min-h-0 flex-1 overflow-y-auto">
           {views?.map((view) => (
             <div key={view.id} className="w-full gap-y-0">
               <ContextMenu>
@@ -178,7 +178,7 @@ export default function TableSidebar({
             </div>
           ))}
         </div>
-        <div className="">
+        <div className="max-h-[45%] flex-none overflow-y-auto">
           <Collapsible
             open={createExpanded}
             onOpenChange={setCreateExpanded}
@@ -400,6 +400,6 @@ export default function TableSidebar({
           </Collapsible>
         </div>
       </div>
-    </div>
+    </aside>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Grid } from "~/app/_components/grid/Grid";
 import {
@@ -11,12 +11,43 @@ import type { GridField } from "~/app/_components/grid/gridTypes";
 import { useColumnWidths } from "~/app/_components/grid/useColumnWidths";
 import { useRowPages } from "~/app/_components/grid/useRowPages";
 import type { AddFilterRequest } from "~/app/_components/ui/FilterPopover";
-import TableNavbar2 from "~/app/_components/ui/TableNavbar2";
+import { ViewToolbar } from "~/app/_components/toolbar/ViewToolbar";
+import { ViewsSidebar } from "~/app/_components/views/ViewsSidebar";
 import { useUpdateViewConfig } from "~/app/_components/useUpdateViewConfig";
 import type { RouterOutputs } from "~/trpc/react";
 import { useViewSearch } from "./useViewSearch";
 
 const PAGE_SIZE = 100;
+const SIDEBAR_KEY = "at.viewsSidebarOpen";
+
+/**
+ * Whether the views sidebar is open, remembered in localStorage. Starts open
+ * and reads the saved value after mount, so server and client markup match.
+ */
+function useViewsSidebarOpen() {
+  const [open, setOpen] = useState(true);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(SIDEBAR_KEY) === "false") setOpen(false);
+    } catch {
+      // Storage can be blocked; the sidebar just starts open.
+    }
+  }, []);
+
+  const toggle = () =>
+    setOpen((previous) => {
+      const next = !previous;
+      try {
+        localStorage.setItem(SIDEBAR_KEY, String(next));
+      } catch {
+        // Not remembered, still toggles.
+      }
+      return next;
+    });
+
+  return [open, toggle] as const;
+}
 
 type WorkspaceProps = {
   baseId: string;
@@ -39,6 +70,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
   );
   const updateConfig = useUpdateViewConfig(viewId);
   const columnWidths = useColumnWidths({ viewId, config });
+  const [sidebarOpen, toggleSidebar] = useViewsSidebarOpen();
   const [addFilterRequest, setAddFilterRequest] =
     useState<AddFilterRequest | null>(null);
 
@@ -99,11 +131,9 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-auto">
-      <TableNavbar2
-        baseId={baseId}
+    <>
+      <ViewToolbar
         tableId={table.id}
-        viewId={viewId}
         viewName={view.name}
         columns={fields}
         config={config}
@@ -115,8 +145,18 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
         onRowsAdded={rowPages.reset}
         isFetching={rowPages.isFetching}
         addFilterRequest={addFilterRequest}
-      >
-        <FillViewportHeight>
+        sidebarOpen={sidebarOpen}
+        onToggleSidebar={toggleSidebar}
+      />
+      <div className="flex min-h-0 flex-1">
+        {sidebarOpen && (
+          <ViewsSidebar
+            baseId={baseId}
+            tableId={table.id}
+            activeViewId={viewId}
+          />
+        )}
+        <div className="relative min-w-0 flex-1">
           <GridColumnToolsProvider value={columnTools}>
             <Grid
               tableId={table.id}
@@ -128,36 +168,8 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
               onClearFilters={clearFilters}
             />
           </GridColumnToolsProvider>
-        </FillViewportHeight>
-      </TableNavbar2>
-    </div>
-  );
-}
-
-/**
- * Gives the grid a definite height: from where it starts to the bottom of the
- * window. The page layout above it doesn't size its children (Phase 3 will
- * fix that with flex), and the grid needs a bounded height to scroll in.
- */
-function FillViewportHeight({ children }: { children: React.ReactNode }) {
-  const ref = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(600);
-
-  useLayoutEffect(() => {
-    const update = () => {
-      const element = ref.current;
-      if (!element) return;
-      const top = element.getBoundingClientRect().top;
-      setHeight(Math.max(240, Math.floor(window.innerHeight - top)));
-    };
-    update();
-    window.addEventListener("resize", update);
-    return () => window.removeEventListener("resize", update);
-  }, []);
-
-  return (
-    <div ref={ref} className="relative w-full" style={{ height }}>
-      {children}
-    </div>
+        </div>
+      </div>
+    </>
   );
 }

@@ -23,7 +23,7 @@ import {
   operatorNeedsValue,
   operatorsFor,
 } from "../filterOptions";
-import type { ToolbarColumn } from "./TableNavbar2";
+import type { ToolbarColumn } from "../toolbar/ViewToolbar";
 
 const MAX_FILTERS = 20;
 const SAVE_DELAY_MS = 300;

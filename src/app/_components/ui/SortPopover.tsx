@@ -16,7 +16,7 @@ import {
 } from "~/components/ui/select";
 import type { ViewSort } from "~/server/db/rows";
 import { SORT_LABELS } from "../filterOptions";
-import type { ToolbarColumn } from "./TableNavbar2";
+import type { ToolbarColumn } from "../toolbar/ViewToolbar";
 
 type Props = {
   columns: ToolbarColumn[];

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useParams } from "next/navigation";
 import { api, type RouterOutputs } from "~/trpc/react";
+import { getBaseColor } from "~/lib/baseColors";
 import { TableDropdown } from "./TableDropdown";
 import {
   DropdownMenu,
@@ -24,15 +25,18 @@ import { Plus } from "lucide-react";
 
 type TableListItem = RouterOutputs["table"]["list"][number];
 
-export function TableNavbar({
-  baseId,
-  initialTables,
-}: {
+export type TableTabsProps = {
   baseId: string;
   initialTables: TableListItem[];
-}) {
+  /** The base's colour name (`Base.color`); the bar is tinted with it. */
+  color: string;
+};
+
+export function TableTabs({ baseId, initialTables, color }: TableTabsProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const { tableId: currentTableId } = useParams<{ tableId?: string }>();
+
+  const { tint } = getBaseColor(color);
 
   const { data: tables } = api.table.list.useQuery(
     { baseId },
@@ -42,9 +46,10 @@ export function TableNavbar({
   );
 
   return (
-    <div className="flex flex-col">
+    <div className="flex-none">
       <div
-        className={`flex h-8 items-center bg-[#c23d01] font-normal text-black`}
+        className="text-at-text flex h-8 items-end text-[13px]"
+        style={{ backgroundColor: tint }}
       >
         {tables.map((table) => (
           <TableDropdown
@@ -58,7 +63,7 @@ export function TableNavbar({
         ))}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button className="ml-2 h-8 cursor-pointer text-white">
+            <button className="text-at-text-muted hover:text-at-text ml-2 h-8 cursor-pointer">
               <Plus className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>

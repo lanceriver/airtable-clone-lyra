@@ -15,7 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import type { ToolbarColumn } from "./TableNavbar2";
+import type { ToolbarColumn } from "../toolbar/ViewToolbar";
 
 type Props = {
   columns: ToolbarColumn[];

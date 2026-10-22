@@ -83,24 +83,20 @@ export function TableDropdown({
     <div className="flex flex-row items-center">
       <Link
         href={`/${baseId}/${tableId}`}
-        className="text-xs text-gray-600 hover:text-blue-500"
+        className={cn(
+          "flex h-8 cursor-pointer items-center rounded-tl-sm px-4 text-[13px] transition-colors",
+          isSelected
+            ? "text-at-text bg-white font-medium"
+            : "text-at-text hover:bg-black/5",
+        )}
       >
-        <button
-          className={cn(
-            "h-8 cursor-pointer rounded-none rounded-tl-sm px-4 py-2 font-semibold transition-colors hover:text-white",
-            isSelected
-              ? "bg-white text-black"
-              : "hover:bg-opacity-20 text-white hover:bg-white/10",
-          )}
-        >
-          {tableName}
-        </button>
+        {tableName}
       </Link>
       {isSelected && (
         <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
           <DropdownMenuTrigger asChild>
-            <button className="flex h-8 items-center rounded-tr-sm border-blue-100 bg-white px-2">
-              <ChevronDown className="ml-1 h-4 w-4 text-gray-500" />
+            <button className="flex h-8 cursor-pointer items-center rounded-tr-sm bg-white pr-2">
+              <ChevronDown className="text-at-text-muted h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
