@@ -25,7 +25,7 @@ still load without issue.
 | Next.js 15.3.2 → 15.5.28 (Vercel refused to deploy the vulnerable version) | ✅ merged (#3) |
 | 2 Grid (full-size scrollbar via paged loading, scaled scrolling, keyboard nav/editing, column tools, footer, empty/loading states) | ✅ merged (#2) |
 | Production | ✅ live at https://airtable-clone-lyra.vercel.app, all migrations applied |
-| 3 Visual 1:1 polish + README | ⏳ next (branch `phase-3-polish` exists, holds only this file) |
+| 3 Visual 1:1 polish + README | ⏳ planned in `docs/plans/phase-3-polish.md` (branch `phase-3-polish`) |
 | 4 Portfolio extras | ⏳ later |
 
 Read `docs/plans/phase-1-data-layer.md`, `docs/plans/phase-2-grid.md` and
