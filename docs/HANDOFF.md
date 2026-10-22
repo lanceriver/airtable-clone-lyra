@@ -27,7 +27,7 @@ still load without issue.
 | 2 Grid (full-size scrollbar via paged loading, scaled scrolling, keyboard nav/editing, column tools, footer, empty/loading states) | ✅ merged (#2) |
 | 3 Visual polish + README (Airtable tokens, base colours, home, sign-in, header/rail, table tabs, views sidebar, toolbar, grid styling, flex layout, swap-when-ready search, 0 lint warnings, README with GIF) | ✅ merged (#4, squash `c661c8f`) |
 | Production | ✅ live at https://airtable-clone-lyra.vercel.app with Phase 3. The `base_color` migration ran on deploy. The new sign-in page was checked with no console errors, and the Google redirect works; the user checked the signed-in pages. |
-| 4 Portfolio extras | ⏳ to plan (scope and open questions below) |
+| 4 Portfolio extras | ⏳ to plan: guest login, free-tier storage limits, a 200k showcase, a Firefox check (below) |
 
 Design docs: `docs/plans/phase-1-data-layer.md`, `phase-2-grid.md`,
 `phase-3-polish.md`; measured numbers in `docs/benchmarks.md`. The README
@@ -65,12 +65,34 @@ Approved earlier by the user:
    without a Google account.
 2. **Abuse limits for the public demo:** a per-user row cap, and a rate limit
    on the 100k button.
-3. **A pre-seeded 1M-row showcase table** that every visitor can open.
+3. **A pre-seeded showcase table of about 200k rows** that every visitor can
+   open. This is the user's decision (option 1, 2026-10-22), because production
+   is on Neon's free tier (see below). The 1M claim stays backed by the README
+   GIF and `docs/benchmarks.md`, both recorded on 1M rows.
 4. **Firefox check** of scaled scrolling.
 
+### Production database: Neon free tier (decided constraints)
+- **Storage:** Neon raised the free plan to 1 GB per project on 2026-10-02
+  ([changelog](https://neon.com/docs/changelog/2026-10-02)); their FAQ still
+  says 0.5 GB. Confirm the project's figure in the Neon console.
+- **Compute:** 100 CU-hours per month per project, and the compute sleeps after
+  5 minutes idle, so the first request after a quiet spell is slow (a cold
+  start).
+- **Cost of rows:** about 1.5 KB of storage per row including indexes (1M rows
+  is about 1.5 GB), so 100k rows is about 150 MB and 200k rows about 300 MB.
+  A 1M-row table cannot fit.
+- **The 100k button can fill the database today:** a few presses by visitors
+  use up the whole quota, after which writes fail for everyone. Phase 4 must
+  ship all of these:
+  - a **per-user row cap** (proposed: 200k, i.e. two presses);
+  - a **global budget** for all non-showcase rows, keeping total storage well
+    under 1 GB, with a friendly error when it's reached;
+  - **guest cleanup** (proposed: hourly cron, deleting guests older than a few
+    hours; see the sort-index note below).
+- **Open:** current production storage use is unknown, so the user needs to
+  read it from the Neon console. The exact caps follow from it.
+
 Worth proposing in the plan (not yet approved):
-- **Guest cleanup:** a Vercel Cron route that deletes guest users (and their
-  data) older than N hours.
 - **E2e scripts in the repo:** move the reusable Playwright scripts into
   `scripts/e2e/` (1M-row checks, layout, flash sampling, scroll perf), so they
   survive container restarts. Today they live in `/tmp` (see Environment).
@@ -97,8 +119,7 @@ Worth proposing in the plan (not yet approved):
 - **Size of a 1M-row table:** about **1.5 GB** in Postgres (833 MB of rows plus
   680 MB of indexes, mostly the trigram search index), measured locally on
   `airtable_bench`.
-  - Check the Neon plan's storage limit before seeding production. The free
-    tier is far smaller than this.
+  - That is more than the free tier's whole quota, hence the 200k showcase.
   - One shared table is affordable; one per guest is not.
 - **Access model:** every procedure checks `base.ownerId === session user`
   (`src/server/api/access.ts`); not-found and forbidden look the same.
