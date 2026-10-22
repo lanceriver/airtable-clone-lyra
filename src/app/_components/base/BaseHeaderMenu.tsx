@@ -128,8 +128,10 @@ export function BaseHeaderMenu({
             className="hover:bg-at-hover focus-visible:ring-at-blue/40 -ml-1 flex max-w-full min-w-0 cursor-pointer items-center gap-3 rounded-md py-1 pr-2 pl-1 text-[17px] font-semibold outline-none focus-visible:ring-2"
           >
             <BaseIcon name={name} color={color} size={32} />
-            <span className="text-at-text truncate">{name}</span>
-            <ChevronDown className="text-at-text-muted -ml-2 size-4 flex-none" />
+            <span className="text-at-text flex min-w-0 items-center gap-1">
+              <span className="max-w-[40vw] flex-none truncate">{name}</span>
+              <ChevronDown className="text-at-text-muted size-4 flex-none" />
+            </span>
           </button>
         </PopoverTrigger>
       </h1>
