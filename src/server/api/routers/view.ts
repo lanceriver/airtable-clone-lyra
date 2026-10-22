@@ -13,6 +13,8 @@ import {
 } from "~/server/db/rows";
 import { isUniqueViolation } from "~/server/db/tables";
 import {
+  MAX_COLUMN_WIDTH_ENTRIES,
+  clampColumnWidth,
   parseViewConfig,
   toColumnInfo,
   type ViewConfig,
@@ -132,6 +134,13 @@ export const viewRouter = createTRPCRouter({
         sort: viewSortSchema.optional(),
         hiddenColumnIds: z.array(z.string()).optional(),
         search: z.string().max(200).optional(),
+        columnWidths: z
+          .record(z.string(), z.number().finite())
+          .refine(
+            (widths) => Object.keys(widths).length <= MAX_COLUMN_WIDTH_ENTRIES,
+            `At most ${MAX_COLUMN_WIDTH_ENTRIES} column widths`,
+          )
+          .optional(),
       }),
     )
     .mutation(async ({ ctx, input }): Promise<ViewConfig> => {
@@ -172,12 +181,25 @@ export const viewRouter = createTRPCRouter({
       }
 
       if (input.hiddenColumnIds !== undefined) {
+        // The primary field (first by order) can't be hidden, as in Airtable.
+        const primaryId = columns[0]?.id;
         data.hiddenColumnIds = [
-          ...new Set(input.hiddenColumnIds.filter((id) => byId.has(id))),
+          ...new Set(
+            input.hiddenColumnIds.filter((id) => byId.has(id) && id !== primaryId),
+          ),
         ];
       }
 
       if (input.search !== undefined) data.search = input.search;
+
+      if (input.columnWidths !== undefined) {
+        // Replaces the saved map; unknown fields are dropped, widths clamped.
+        data.columnWidths = Object.fromEntries(
+          Object.entries(input.columnWidths)
+            .filter(([id]) => byId.has(id))
+            .map(([id, width]) => [id, clampColumnWidth(width)]),
+        );
+      }
 
       const updated = await ctx.db.view.update({
         where: { id: view.id },

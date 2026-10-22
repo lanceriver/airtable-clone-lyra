@@ -29,7 +29,8 @@ correct rows.
     JSON string, number is a JSON number. **An empty cell is a missing key**:
     empty strings are never stored.
   - `order int not null`: insertion order within the table, used for the
-    default (unsorted) order. Index `("tableId", "order")`.
+    default (unsorted) order. Unique index `("tableId", "order")` (made unique in
+    Phase 2, task 2.1).
   - `searchText text not null default ''` (`search_text`): maintained by a
     `BEFORE INSERT OR UPDATE OF data` trigger as
     `lower(string_agg(value, chr(31)))` over all values. The unit-separator
@@ -87,9 +88,10 @@ All row SQL lives in one module and is composed with `Prisma.sql`.
   Airtable while you're still typing.
 - **Search**: `"search_text" LIKE '%' || $q || '%'` (lower-cased, escaped),
   combined with the filters using AND.
-- **Pagination**: keyset only, never OFFSET.
-  - Unsorted: `ORDER BY "order" ASC, "id" ASC`, cursor `{ order, id }`,
-    condition `("order", "id") > ($o, $id)`.
+- **Pagination**: keyset, with OFFSET only for jumps (added in Phase 2, task
+  2.1: `queryRows({ offset })`, exclusive with `cursor`).
+  - Unsorted: `ORDER BY "order" ASC`, cursor `{ order, id }`, condition
+    `"order" > $o` (`order` is unique per table; the cursor's id is ignored).
   - Sorted asc: `ORDER BY sortKey ASC, "id" ASC`, condition `(sortKey, "id") > ($k, $id)`.
   - Sorted desc: `ORDER BY sortKey DESC, "id" DESC`, condition `(sortKey, "id") < ($k, $id)`.
   - Fetch `limit + 1` rows; if the extra row exists, return a cursor built from

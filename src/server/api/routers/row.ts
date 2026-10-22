@@ -14,6 +14,8 @@ import {
   countRows,
   queryRows,
   rowCursorSchema,
+  rowOffsetSchema,
+  RowQueryInputError,
   type RowRecord,
 } from "~/server/db/rows";
 import { parseViewConfig, toColumnInfo } from "~/server/db/viewConfig";
@@ -55,24 +57,47 @@ export const rowRouter = createTRPCRouter({
       z.object({
         viewId: z.string(),
         limit: z.number().int().min(1).max(500).default(200),
+        // Continue after the previous page (keyset). Exclusive with offset.
         cursor: rowCursorSchema.nullish(),
+        // Jump to a page that has no cursor: skip this many matching rows.
+        offset: rowOffsetSchema.optional(),
+        // "backward" returns the rows just before `cursor` (requires cursor).
+        direction: z.enum(["forward", "backward"]).optional(),
         search: z.string().max(200).optional(),
       }),
     )
     .query(async ({ ctx, input }) => {
+      if (input.cursor && input.offset !== undefined) {
+        throw badRequest("cursor and offset are mutually exclusive");
+      }
+      if (input.direction === "backward") {
+        if (!input.cursor) throw badRequest("backward pages require a cursor");
+        if (input.offset !== undefined) {
+          throw badRequest("backward pages cannot be combined with offset");
+        }
+      }
       const userId = ctx.session.user.id;
       const view = await assertViewAccess(ctx.db, userId, input.viewId);
       const table = await assertTableAccess(ctx.db, userId, view.tableId);
       const config = parseViewConfig(view);
-      return queryRows(ctx.db, {
-        tableId: table.id,
-        columns: toColumnInfo(table.columns),
-        filters: config.filters,
-        sort: config.sort,
-        search: input.search ?? config.search,
-        limit: input.limit,
-        cursor: input.cursor,
-      });
+      try {
+        return await queryRows(ctx.db, {
+          tableId: table.id,
+          columns: toColumnInfo(table.columns),
+          filters: config.filters,
+          sort: config.sort,
+          search: input.search ?? config.search,
+          limit: input.limit,
+          cursor: input.cursor,
+          offset: input.offset,
+          direction: input.direction,
+        });
+      } catch (error) {
+        if (error instanceof RowQueryInputError) {
+          throw badRequest(error.message);
+        }
+        throw error;
+      }
     }),
 
   countRows: protectedProcedure

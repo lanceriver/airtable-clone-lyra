@@ -61,13 +61,19 @@ function toFilter(draft: DraftFilter, columns: ToolbarColumn[]): ViewFilter {
   return { ...filter, value: isNumber && Number.isFinite(numeric) ? numeric : value };
 }
 
+/** Asks the popover to open with a new condition on `columnId`. */
+export type AddFilterRequest = { key: number; columnId: string };
+
 type Props = {
   columns: ToolbarColumn[];
   filters: ViewFilter[];
   onChange: (filters: ViewFilter[]) => void;
+  /** A new `key` adds a condition on that field and opens the popover. */
+  addRequest?: AddFilterRequest | null;
 };
 
-export function FilterPopover({ columns, filters, onChange }: Props) {
+export function FilterPopover({ columns, filters, onChange, addRequest }: Props) {
+  const [open, setOpen] = useState(false);
   const [drafts, setDrafts] = useState<DraftFilter[]>(() => filters.map(toDraft));
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<(() => void) | null>(null);
@@ -95,6 +101,36 @@ export function FilterPopover({ columns, filters, onChange }: Props) {
       save();
     }
   };
+
+  // "Filter by this field" in a column's menu. Drafts are the freshest copy of
+  // the filters (they include a change still waiting to be saved), so the new
+  // condition is added to them.
+  const handledRequest = useRef<number | null>(null);
+  useEffect(() => {
+    if (!addRequest || handledRequest.current === addRequest.key) return;
+    handledRequest.current = addRequest.key;
+    const column = columns.find((c) => c.id === addRequest.columnId);
+    if (!column || drafts.length >= MAX_FILTERS) {
+      setOpen(true);
+      return;
+    }
+    if (timer.current) clearTimeout(timer.current);
+    update(
+      [
+        ...drafts,
+        {
+          id: crypto.randomUUID(),
+          columnId: column.id,
+          operator: operatorsFor(column.type)[0]!,
+          value: "",
+        },
+      ],
+      false,
+    );
+    // Let the menu that sent the request finish closing first.
+    setTimeout(() => setOpen(true), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [addRequest]);
 
   const typeOf = (columnId: string) =>
     columns.find((c) => c.id === columnId)?.type ?? "string";
@@ -137,7 +173,7 @@ export function FilterPopover({ columns, filters, onChange }: Props) {
   const activeFields = new Set(drafts.filter(isActive).map((d) => d.columnId)).size;
 
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${activeFields > 0 ? "bg-[#eafbeb]" : ""}`}>
           <Filter className="h-4 w-4" />

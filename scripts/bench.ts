@@ -24,6 +24,7 @@ import {
   queryRows,
   sortIndexName,
   type ColumnInfo,
+  type PageQuery,
   type RowCursor,
   type RowQuery,
   type ViewFilter,
@@ -72,8 +73,6 @@ type Result = {
   /** EXPLAIN (ANALYZE, BUFFERS) output, captured when the median > SLOW_MS. */
   plan?: string;
 };
-
-type PageQuery = RowQuery & { limit: number; cursor?: RowCursor | null };
 
 /** Runs EXPLAIN on the page query the builder generates. */
 async function explain(
@@ -234,7 +233,10 @@ async function main(db: PrismaClient): Promise<void> {
 
   const base_ = { tableId, columns: cols };
   const page = (
-    extra: Partial<RowQuery> & { cursor?: RowCursor | null } = {},
+    extra: Partial<RowQuery> & {
+      cursor?: RowCursor | null;
+      offset?: number;
+    } = {},
   ) => ({ ...base_, limit: PAGE_SIZE, ...extra });
 
   let filterSeq = 0;
@@ -255,6 +257,12 @@ async function main(db: PrismaClient): Promise<void> {
   const rareTerm = sample[0]?.name;
   if (!rareTerm) throw new Error("Could not pick a random name");
 
+  // Offsets are given for a 1M-row table and scaled down for smaller ones, so
+  // the labels show the offset that was actually used.
+  const offsetAt = (n: number) => Math.floor((n * N) / 1_000_000);
+  const kLabel = (n: number) =>
+    n >= 1000 && n % 1000 === 0 ? `${n / 1000}k` : String(n);
+
   const timedPage = (label: string, q: PageQuery) =>
     measure(label, async () => (await queryRows(db, q)).rows.length, q);
 
@@ -266,6 +274,10 @@ async function main(db: PrismaClient): Promise<void> {
   await dropSortIndexes(db, { tableId });
 
   await timedPage("Unfiltered, first page", page());
+  for (const n of [500_000, 990_000]) {
+    const offset = offsetAt(n);
+    await timedPage(`Unsorted offset ${kLabel(offset)}`, page({ offset }));
+  }
   await timedPage(
     "Unfiltered, deep page (cursor at 90% of rows)",
     page({ cursor: { order: Math.floor(N * 0.9), id: "" } }),
@@ -279,6 +291,13 @@ async function main(db: PrismaClient): Promise<void> {
     "Filter Score > 5000, first page",
     page({ filters: [scoreGt] }),
   );
+  {
+    const offset = offsetAt(250_000);
+    await timedPage(
+      `Filter Score>5000 offset ${kLabel(offset)}`,
+      page({ filters: [scoreGt], offset }),
+    );
+  }
   await timedPage(
     'Filter Name contains "ar", first page',
     page({ filters: [nameContains] }),
@@ -329,6 +348,13 @@ async function main(db: PrismaClient): Promise<void> {
     "Sort Name asc, page 50 (index)",
     page({ sort: nameAsc, cursor }),
   );
+  {
+    const offset = offsetAt(500_000);
+    await timedPage(
+      `Sorted (Name asc, indexed) offset ${kLabel(offset)}`,
+      page({ sort: nameAsc, offset }),
+    );
+  }
   await timedPage(
     "Sort Score desc, first page (index)",
     page({ sort: scoreDesc }),
@@ -450,6 +476,8 @@ ${o.plan}
 ${slowSection}
 
 ## Notes
+
+Offset rows are for scrollbar jumps, which have no keyset cursor: the database walks past every skipped row, so the cost grows with the offset (and filtered or sorted offsets must evaluate every skipped row). Sequential pages use keyset conditions and stay at a few milliseconds. The unsorted offset walks the unique \`("tableId", "order")\` index in order, with no sort step.
 
 These are warm-cache numbers from a local machine: Postgres and the benchmark run on the same host, so there is no network hop and the table and indexes are already in memory. A hosted database adds network latency to every request (typically a few to tens of milliseconds per round trip), and a cold cache makes the first query after a restart slower.
 
