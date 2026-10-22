@@ -31,7 +31,7 @@ type CellEditorProps = {
   value: CellValue;
 };
 
-const BLUE = "outline-[#166ee1]";
+const BLUE = "outline-at-blue";
 const RED = "outline-[#d4351c]";
 
 /**

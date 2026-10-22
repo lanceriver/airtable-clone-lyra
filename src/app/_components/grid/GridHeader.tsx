@@ -6,7 +6,7 @@ import { useState } from "react";
 import { AddFieldPopover } from "./AddFieldPopover";
 import { ColumnResizeHandle } from "./ColumnResizeHandle";
 import { FieldMenu } from "./FieldMenu";
-import { PRIMARY_SHADOW_CLASS } from "./GridCell";
+import { PRIMARY_BORDER_CLASS, PRIMARY_SHADOW_CLASS } from "./GridCell";
 import {
   ADD_FIELD_WIDTH,
   HEADER_HEIGHT,
@@ -23,7 +23,7 @@ type GridHeaderProps = {
 };
 
 const HEADER_CELL =
-  "box-border flex h-8 flex-none items-center border-b border-r border-[#dfe2e4]";
+  "box-border flex h-8 flex-none items-center border-b border-r border-at-grid-line";
 
 /**
  * The sticky header row: an empty cell above the row numbers, one cell per
@@ -42,14 +42,14 @@ export function GridHeader({ tableId, columns, width }: GridHeaderProps) {
       <div
         role="columnheader"
         aria-label="Row number"
-        className={`${HEADER_CELL} sticky left-0 z-10 bg-[#f5f5f5]`}
+        className={`${HEADER_CELL} sticky left-0 z-10 bg-[#f4f4f4]`}
         style={{ width: ROW_NUMBER_WIDTH }}
       />
       {columns.map((column) => (
         <HeaderCell key={column.id} column={column} />
       ))}
       <div
-        className={`${HEADER_CELL} bg-[#f5f5f5]`}
+        className={`${HEADER_CELL} bg-[#f4f4f4]`}
         style={{ width: ADD_FIELD_WIDTH }}
       >
         <AddFieldPopover tableId={tableId} />
@@ -58,10 +58,11 @@ export function GridHeader({ tableId, columns, width }: GridHeaderProps) {
   );
 }
 
+/** Sorted (wins) and filtered columns: a stronger tint than their cells. */
 function headerBackground(column: GridColumn): string {
-  if (column.sortDirection) return "bg-[#ffe9db]";
-  if (column.filtered) return "bg-[#eafbeb]";
-  return "bg-[#f5f5f5]";
+  if (column.sortDirection) return "bg-[#ffe8d6]";
+  if (column.filtered) return "bg-[#d9f5db]";
+  return "bg-[#f4f4f4]";
 }
 
 function HeaderCell({ column }: { column: GridColumn }) {
@@ -80,9 +81,9 @@ function HeaderCell({ column }: { column: GridColumn }) {
             ? "descending"
             : undefined
       }
-      className={`${HEADER_CELL} group/header gap-1.5 px-2 text-[13px] font-medium text-[#1d1f25] ${headerBackground(
+      className={`${HEADER_CELL} group/header text-at-text gap-1.5 px-2 text-[13px] font-normal ${headerBackground(
         column,
-      )} ${column.isPrimary ? `sticky z-10 ${PRIMARY_SHADOW_CLASS}` : "relative"}`}
+      )} ${column.isPrimary ? `sticky z-10 ${PRIMARY_BORDER_CLASS} ${PRIMARY_SHADOW_CLASS}` : "relative"}`}
       style={
         column.isPrimary
           ? { width: column.width, left: ROW_NUMBER_WIDTH }
@@ -97,7 +98,7 @@ function HeaderCell({ column }: { column: GridColumn }) {
           : undefined
       }
     >
-      <Icon className="h-3.5 w-3.5 flex-none text-[#616670]" aria-hidden />
+      <Icon className="text-at-text-muted h-3.5 w-3.5 flex-none" aria-hidden />
       <span className="min-w-0 flex-1 truncate whitespace-nowrap">
         {column.name}
       </span>

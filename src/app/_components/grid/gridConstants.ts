@@ -19,7 +19,5 @@ export const PREFETCH_ROWS = 100;
 /** Shimmer rows shown while the first count loads. */
 export const SKELETON_ROWS = 20;
 
-export const GRID_LINE_COLOR = "#dfe2e4";
-
 /** The rows layer is re-anchored every this many rows (see GridBody). */
 export const ANCHOR_BLOCK = 50;

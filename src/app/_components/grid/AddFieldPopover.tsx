@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, Hash, Plus, Type, type LucideIcon } from "lucide-react";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "~/components/ui/button";
@@ -35,14 +35,14 @@ export function AddFieldPopover({ tableId }: { tableId: string }) {
           type="button"
           aria-label="Add field"
           data-testid="add-field-trigger"
-          className="flex h-full w-full cursor-pointer items-center justify-center text-[#616670] outline-none hover:bg-black/5 focus-visible:bg-black/5"
+          className="text-at-text-muted hover:bg-at-hover focus-visible:bg-at-hover flex h-full w-full cursor-pointer items-center justify-center outline-none"
         >
           <Plus className="h-4 w-4" aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent
         align="start"
-        className="w-72 p-3"
+        className="w-80 p-4"
         onKeyDown={(event) => event.stopPropagation()}
         onContextMenu={(event) => event.stopPropagation()}
       >
@@ -65,6 +65,7 @@ function AddFieldForm({
   const [name, setName] = useState("");
   const [type, setType] = useState<ColumnType>("string");
   const [serverError, setServerError] = useState<string | null>(null);
+  const nameId = useId();
 
   const fieldCount = tools?.fields.length ?? 0;
   const trimmed = name.trim();
@@ -94,11 +95,17 @@ function AddFieldForm({
   };
 
   return (
-    <form onSubmit={submit} className="grid gap-3">
+    <form onSubmit={submit} className="grid gap-4">
       <div className="grid gap-1.5">
+        <label
+          htmlFor={nameId}
+          className="text-at-text text-[13px] font-medium"
+        >
+          Field name
+        </label>
         <Input
+          id={nameId}
           autoFocus
-          aria-label="Field name"
           aria-invalid={error !== null}
           placeholder={`Field ${fieldCount + 1}`}
           maxLength={FIELD_NAME_MAX_LENGTH}
@@ -109,28 +116,33 @@ function AddFieldForm({
           }}
         />
         {error && (
-          <p role="alert" className="text-xs text-red-600">
+          <p role="alert" className="text-destructive text-xs">
             {error}
           </p>
         )}
       </div>
-      <div role="radiogroup" aria-label="Field type" className="grid gap-0.5">
-        {FIELD_TYPES.map(({ type: value, label, Icon }) => (
-          <button
-            key={value}
-            type="button"
-            role="radio"
-            aria-checked={type === value}
-            onClick={() => setType(value)}
-            className={`flex h-8 cursor-pointer items-center gap-2 rounded px-2 text-left text-sm outline-none hover:bg-gray-100 focus-visible:ring-2 focus-visible:ring-[#166ee1]/50 ${
-              type === value ? "bg-gray-100 font-medium" : ""
-            }`}
-          >
-            <Icon className="h-4 w-4 text-[#616670]" aria-hidden />
-            <span className="flex-1">{label}</span>
-            {type === value && <Check className="h-4 w-4" aria-hidden />}
-          </button>
-        ))}
+      <div className="grid gap-1.5">
+        <span className="text-at-text text-[13px] font-medium">Field type</span>
+        <div role="radiogroup" aria-label="Field type" className="grid gap-0.5">
+          {FIELD_TYPES.map(({ type: value, label, Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="radio"
+              aria-checked={type === value}
+              onClick={() => setType(value)}
+              className={`text-at-text hover:bg-at-hover focus-visible:ring-at-blue/40 flex h-8 cursor-pointer items-center gap-2 rounded-md px-2.5 text-left text-[13px] outline-none focus-visible:ring-2 ${
+                type === value ? "bg-at-selected" : ""
+              }`}
+            >
+              <Icon className="text-at-text-muted size-4" aria-hidden />
+              <span className="flex-1">{label}</span>
+              {type === value && (
+                <Check className="text-at-text size-4" aria-hidden />
+              )}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onDone}>
@@ -138,6 +150,7 @@ function AddFieldForm({
         </Button>
         <Button
           type="submit"
+          variant="primary"
           size="sm"
           disabled={trimmed === "" || taken || create.isPending}
         >
