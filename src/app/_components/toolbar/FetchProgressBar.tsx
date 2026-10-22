@@ -31,7 +31,7 @@ export function FetchProgressBar({ active }: { active: boolean }) {
     >
       <style>{`@keyframes fetch-progress-slide{0%{transform:translateX(-100%)}100%{transform:translateX(250%)}}`}</style>
       <div
-        className="h-full w-2/5 bg-blue-600"
+        className="bg-at-blue h-full w-2/5"
         style={{ animation: "fetch-progress-slide 1.1s ease-in-out infinite" }}
       />
     </div>

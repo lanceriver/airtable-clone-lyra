@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Filter, Plus, TrashIcon } from "lucide-react";
+import { Filter, Plus, Trash2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
 import {
   Popover,
   PopoverContent,
@@ -17,6 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
+import { cn } from "~/lib/utils";
 import type { FilterOperator, ViewFilter } from "~/server/db/rows";
 import {
   OPERATOR_LABELS,
@@ -194,115 +194,127 @@ export function FilterPopover({
     );
   };
 
-  const activeFields = new Set(drafts.filter(isActive).map((d) => d.columnId))
-    .size;
+  const activeFields = new Set(drafts.filter(isActive).map((d) => d.columnId));
+  const activeCount = activeFields.size;
+  const firstActiveName = columns.find((c) => activeFields.has(c.id))?.name;
+  const label =
+    activeCount === 0
+      ? "Filter"
+      : activeCount === 1
+        ? `Filtered by ${firstActiveName ?? "1 field"}`
+        : `Filtered by ${activeCount} fields`;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 cursor-pointer gap-1 ${activeFields > 0 ? "bg-[#eafbeb]" : ""}`}
+          variant="toolbar"
+          size="toolbar"
+          className={cn(
+            "data-[state=open]:bg-at-hover data-[state=open]:text-at-text",
+            activeCount > 0 &&
+              "bg-at-filter-tint text-at-text hover:bg-at-filter-tint/80 data-[state=open]:bg-at-filter-tint",
+          )}
         >
-          <Filter className="h-4 w-4" />
-          <span className="font-normal">
-            {activeFields > 0
-              ? `Filtered by ${activeFields} ${activeFields === 1 ? "field" : "fields"}`
-              : "Filter"}
-          </span>
+          <Filter />
+          <span className="max-w-48 truncate">{label}</span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="grid w-150 grid-cols-1 gap-y-5" align="start">
-        <Label>
+      <PopoverContent
+        className="w-150 max-w-[calc(100vw-32px)] p-4 text-[13px]"
+        align="start"
+      >
+        <div className="text-at-text-muted mb-3 text-[13px]">
           {drafts.length === 0
             ? "No filter conditions are applied"
-            : "In this view, show records"}
-        </Label>
-        {drafts.map((draft, index) => {
-          const type = typeOf(draft.columnId);
-          return (
-            <div
-              key={draft.id}
-              className="flex flex-row items-center gap-2"
-              data-testid="filter-row"
-            >
-              <span className="w-12 shrink-0 text-sm">
-                {index === 0 ? "Where" : "And"}
-              </span>
-              <Select
-                value={draft.columnId}
-                onValueChange={(value) => changeColumn(draft, value)}
-              >
-                <SelectTrigger
-                  className="w-[150px] rounded-none"
-                  aria-label="Filter field"
-                >
-                  <SelectValue placeholder="Select a column" />
-                </SelectTrigger>
-                <SelectContent>
-                  {columns.map((column) => (
-                    <SelectItem key={column.id} value={column.id}>
-                      {column.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={draft.operator}
-                onValueChange={(value) =>
-                  patchFilter(draft.id, { operator: value as FilterOperator })
-                }
-              >
-                <SelectTrigger
-                  className="w-[150px] rounded-none"
-                  aria-label="Filter operator"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {operatorsFor(type).map((operator) => (
-                    <SelectItem key={operator} value={operator}>
-                      {OPERATOR_LABELS[operator]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {operatorNeedsValue(draft.operator) && (
-                <Input
-                  aria-label="Filter value"
-                  placeholder="Enter a value"
-                  className="rounded-none text-sm"
-                  type={type === "number" ? "number" : "text"}
-                  step="any"
-                  value={draft.value}
-                  onChange={(e) =>
-                    patchFilter(draft.id, { value: e.target.value }, true)
-                  }
-                />
-              )}
-              <div className="ml-auto border">
-                <TrashIcon
-                  aria-label="Remove filter"
-                  className="h-[34px] w-[33px] cursor-pointer p-2 hover:text-red-500"
-                  onClick={() => removeFilter(draft.id)}
-                />
-              </div>
-            </div>
-          );
-        })}
-        <div>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1"
-            disabled={drafts.length >= MAX_FILTERS || columns.length === 0}
-            onClick={addFilter}
-          >
-            <Plus className="h-4 w-4" />
-            Add condition
-          </Button>
+            : "In this view, show records where"}
         </div>
+        <div className="flex flex-col gap-2">
+          {drafts.map((draft, index) => {
+            const type = typeOf(draft.columnId);
+            return (
+              <div
+                key={draft.id}
+                className="flex flex-row items-center gap-2"
+                data-testid="filter-row"
+              >
+                <span className="text-at-text-muted w-12 shrink-0 text-[13px]">
+                  {index === 0 ? "Where" : "And"}
+                </span>
+                <Select
+                  value={draft.columnId}
+                  onValueChange={(value) => changeColumn(draft, value)}
+                >
+                  <SelectTrigger
+                    className="w-37.5 shrink-0"
+                    aria-label="Filter field"
+                  >
+                    <SelectValue placeholder="Select a column" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {columns.map((column) => (
+                      <SelectItem key={column.id} value={column.id}>
+                        {column.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={draft.operator}
+                  onValueChange={(value) =>
+                    patchFilter(draft.id, { operator: value as FilterOperator })
+                  }
+                >
+                  <SelectTrigger
+                    className="w-37.5 shrink-0"
+                    aria-label="Filter operator"
+                  >
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {operatorsFor(type).map((operator) => (
+                      <SelectItem key={operator} value={operator}>
+                        {OPERATOR_LABELS[operator]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {operatorNeedsValue(draft.operator) && (
+                  <Input
+                    aria-label="Filter value"
+                    placeholder="Enter a value"
+                    className="min-w-0 flex-1"
+                    type={type === "number" ? "number" : "text"}
+                    step="any"
+                    value={draft.value}
+                    onChange={(e) =>
+                      patchFilter(draft.id, { value: e.target.value }, true)
+                    }
+                  />
+                )}
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="ml-auto"
+                  aria-label="Remove filter"
+                  onClick={() => removeFilter(draft.id)}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
+            );
+          })}
+        </div>
+        <Button
+          variant="ghost"
+          size="toolbar"
+          className="text-at-primary hover:text-at-primary [&_svg:not([class*='text-'])]:text-at-primary mt-3 -ml-2 font-medium"
+          disabled={drafts.length >= MAX_FILTERS || columns.length === 0}
+          onClick={addFilter}
+        >
+          <Plus />
+          Add condition
+        </Button>
       </PopoverContent>
     </Popover>
   );

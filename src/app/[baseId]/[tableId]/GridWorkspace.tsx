@@ -124,6 +124,13 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
   const isSortPending = pendingSort !== undefined;
   const displaySort = isSortPending ? pendingSort : config.sort;
 
+  // The count for the text in the box: known once the rows shown were fetched
+  // for exactly that text (before that, the count is the previous search's).
+  const searchMatchCount =
+    searchInput === search && rowPages.resultSearch === search
+      ? rowPages.total
+      : undefined;
+
   // The record count lives in the grid's footer.
   const clearFilters = () => {
     setSearchInput("");
@@ -133,7 +140,9 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
   return (
     <>
       <ViewToolbar
+        baseId={baseId}
         tableId={table.id}
+        viewId={viewId}
         viewName={view.name}
         columns={fields}
         config={config}
@@ -142,6 +151,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
         onUpdateConfig={updateConfig.update}
         searchInput={searchInput}
         onSearchChange={setSearchInput}
+        searchMatchCount={searchMatchCount}
         onRowsAdded={rowPages.reset}
         isFetching={rowPages.isFetching}
         addFilterRequest={addFilterRequest}

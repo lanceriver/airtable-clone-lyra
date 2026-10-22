@@ -15,6 +15,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
+import { cn } from "~/lib/utils";
 import type { ToolbarColumn } from "./ViewToolbar";
 
 type Props = {
@@ -55,21 +56,25 @@ export function HideFieldsPopover({
     <Popover onOpenChange={(open) => !open && setQuery("")}>
       <PopoverTrigger asChild>
         <Button
-          variant="ghost"
-          size="sm"
-          className={`h-8 cursor-pointer gap-1 ${hiddenCount > 0 ? "bg-[#d2e5fb] hover:bg-[#c2dbf8]" : ""}`}
+          variant="toolbar"
+          size="toolbar"
+          className={cn(
+            "data-[state=open]:bg-at-hover data-[state=open]:text-at-text",
+            hiddenCount > 0 &&
+              "bg-at-hidden-tint text-at-text hover:bg-at-hidden-tint/80 data-[state=open]:bg-at-hidden-tint",
+          )}
         >
-          <EyeOff className="h-4 w-4" />
-          <span className="font-normal">
+          <EyeOff />
+          <span>
             {hiddenCount > 0
               ? `${hiddenCount} hidden ${hiddenCount === 1 ? "field" : "fields"}`
               : "Hide fields"}
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 p-0" align="start">
-        <div className="flex items-center gap-2 border-b px-3 py-2">
-          <Search className="h-4 w-4 shrink-0 text-gray-500" />
+      <PopoverContent className="w-72 p-0 text-[13px]" align="start">
+        <div className="border-at-border flex items-center gap-2 border-b px-3 py-2">
+          <Search className="text-at-text-muted size-4 shrink-0" />
           <Input
             placeholder="Find a field"
             aria-label="Find a field"
@@ -79,13 +84,18 @@ export function HideFieldsPopover({
           />
         </div>
 
-        <ul className="max-h-72 overflow-y-auto py-1" aria-label="Fields">
+        <ul className="max-h-72 overflow-y-auto p-1.5" aria-label="Fields">
           {matches.map((column) => {
             const isPrimary = column.id === primaryId;
             const Icon = column.type === "number" ? Hash : Type;
             const row = (
               <label
-                className={`flex items-center gap-2 px-3 py-1.5 text-sm ${isPrimary ? "cursor-not-allowed" : "cursor-pointer hover:bg-gray-100"}`}
+                className={cn(
+                  "flex h-8 items-center gap-2 rounded-sm px-2.5 text-[13px]",
+                  isPrimary
+                    ? "cursor-not-allowed"
+                    : "hover:bg-at-hover cursor-pointer",
+                )}
               >
                 <Switch
                   className="h-3.5 w-6 [&_[data-slot=switch-thumb]]:size-2.5"
@@ -94,8 +104,8 @@ export function HideFieldsPopover({
                   disabled={isPrimary}
                   onCheckedChange={(checked) => toggle(column.id, checked)}
                 />
-                <Icon className="h-3.5 w-3.5 shrink-0 text-gray-500" />
-                <span className="truncate">{column.name}</span>
+                <Icon className="text-at-text-muted size-4 shrink-0" />
+                <span className="text-at-text truncate">{column.name}</span>
               </label>
             );
             return (
@@ -114,23 +124,23 @@ export function HideFieldsPopover({
             );
           })}
           {matches.length === 0 && (
-            <li className="px-3 py-3 text-sm text-gray-500">No fields match</li>
+            <li className="text-at-text-muted px-2.5 py-2">No fields match</li>
           )}
         </ul>
 
-        <div className="flex gap-2 border-t p-2">
+        <div className="border-at-border flex gap-2 border-t p-2">
           <Button
             variant="secondary"
-            size="sm"
-            className="h-8 flex-1 cursor-pointer font-normal"
+            size="default"
+            className="flex-1"
             onClick={hideAll}
           >
             Hide all
           </Button>
           <Button
             variant="secondary"
-            size="sm"
-            className="h-8 flex-1 cursor-pointer font-normal"
+            size="default"
+            className="flex-1"
             onClick={showAll}
           >
             Show all

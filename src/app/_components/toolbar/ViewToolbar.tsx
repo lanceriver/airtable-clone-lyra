@@ -1,36 +1,23 @@
 "use client";
 
 import {
-  Calendar,
-  ChevronDown,
-  Grid,
-  LayoutGrid,
+  Loader2,
   Menu,
   Palette,
-  Search,
   Share2,
-  X,
+  StretchHorizontal,
+  Group as GroupIcon,
+  Zap,
 } from "lucide-react";
+
+import { NotInDemo } from "~/components/at/NotInDemo";
 import { Button } from "~/components/ui/button";
-import { Input } from "~/components/ui/input";
 import { Separator } from "~/components/ui/separator";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "~/components/ui/dropdown-menu";
 import {
   Tooltip,
   TooltipContent,
-  TooltipProvider,
   TooltipTrigger,
 } from "~/components/ui/tooltip";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "~/components/ui/popover";
 import type { RouterOutputs } from "~/trpc/react";
 import type { ColumnType, ViewFilter, ViewSort } from "~/server/db/rows";
 import type { ViewConfigPatch } from "../useUpdateViewConfig";
@@ -38,12 +25,16 @@ import { FilterPopover, type AddFilterRequest } from "./FilterPopover";
 import { SortPopover } from "./SortPopover";
 import { HideFieldsPopover } from "./HideFieldsPopover";
 import { FetchProgressBar } from "./FetchProgressBar";
+import { SearchPanel } from "./SearchPanel";
+import { ViewMenu } from "./ViewMenu";
 import { useAddFakeRows } from "./useAddFakeRows";
 
 export type ToolbarColumn = { id: string; name: string; type: ColumnType };
 
 export type ViewToolbarProps = {
+  baseId: string;
   tableId: string;
+  viewId: string;
   viewName: string;
   columns: ToolbarColumn[];
   config: RouterOutputs["view"]["get"]["config"];
@@ -53,6 +44,11 @@ export type ViewToolbarProps = {
   onUpdateConfig: (patch: ViewConfigPatch) => void;
   searchInput: string;
   onSearchChange: (search: string) => void;
+  /**
+   * Records matching the text in the search box, or undefined while the count
+   * for that text isn't in yet.
+   */
+  searchMatchCount?: number;
   /** Shows the thin progress bar under the toolbar while rows are loading. */
   isFetching?: boolean;
   /** Called after "Add 100k rows" succeeds, for the grid to reload its rows. */
@@ -64,8 +60,28 @@ export type ViewToolbarProps = {
   onToggleSidebar: () => void;
 };
 
+/** A decorative toolbar button: its label collapses to the icon below 1200 px. */
+function DecorativeButton({
+  icon,
+  label,
+}: {
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <NotInDemo>
+      <Button variant="toolbar" size="toolbar" aria-label={label}>
+        {icon}
+        <span className="max-[1200px]:hidden">{label}</span>
+      </Button>
+    </NotInDemo>
+  );
+}
+
 export function ViewToolbar({
+  baseId,
   tableId,
+  viewId,
   viewName,
   columns,
   config,
@@ -74,6 +90,7 @@ export function ViewToolbar({
   onUpdateConfig,
   searchInput,
   onSearchChange,
+  searchMatchCount,
   isFetching = false,
   onRowsAdded,
   addFilterRequest,
@@ -85,150 +102,91 @@ export function ViewToolbar({
   const handleFiltersChange = (filters: ViewFilter[]) =>
     onUpdateConfig({ filters });
 
+  const sidebarLabel = sidebarOpen ? "Hide sidebar" : "Show sidebar";
+
   return (
-    <div className="border-at-border relative flex h-12 flex-none items-center border-b bg-white px-2">
-      <TooltipProvider>
+    <div className="border-at-border relative flex h-12 flex-none items-center gap-0.5 border-b bg-white px-3">
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="toolbar"
+            size="icon-sm"
+            aria-label={sidebarLabel}
+            aria-expanded={sidebarOpen}
+            onClick={onToggleSidebar}
+          >
+            <Menu />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>{sidebarLabel}</TooltipContent>
+      </Tooltip>
+
+      <Separator orientation="vertical" className="mx-2 h-4" />
+
+      <ViewMenu
+        baseId={baseId}
+        tableId={tableId}
+        viewId={viewId}
+        viewName={viewName}
+      />
+
+      <div className="ml-auto flex flex-none items-center gap-0.5 pl-2">
+        <HideFieldsPopover
+          columns={columns}
+          hiddenColumnIds={config.hiddenColumnIds}
+          onChange={(hiddenColumnIds) => onUpdateConfig({ hiddenColumnIds })}
+        />
+
+        <FilterPopover
+          columns={columns}
+          filters={config.filters}
+          onChange={handleFiltersChange}
+          addRequest={addFilterRequest}
+        />
+
+        <DecorativeButton icon={<GroupIcon />} label="Group" />
+
+        <SortPopover
+          columns={columns}
+          sort={displaySort}
+          isPending={isSortPending}
+          onChange={(sort) => onUpdateConfig({ sort })}
+        />
+
+        <DecorativeButton icon={<Palette />} label="Color" />
+
+        <NotInDemo>
+          <Button variant="toolbar" size="icon-sm" aria-label="Row height">
+            <StretchHorizontal />
+          </Button>
+        </NotInDemo>
+
+        <DecorativeButton icon={<Share2 />} label="Share and sync" />
+
         <Tooltip>
           <TooltipTrigger asChild>
             <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 cursor-pointer gap-1"
-              aria-pressed={sidebarOpen}
-              onClick={onToggleSidebar}
+              variant="toolbar"
+              size="toolbar"
+              disabled={addRows.isPending}
+              onClick={addRows.add}
             >
-              <Menu className="h-4 w-4" />
-              <span className="font-normal">Views</span>
+              {addRows.isPending ? (
+                <Loader2 className="animate-spin" />
+              ) : (
+                <Zap />
+              )}
+              <span>{addRows.isPending ? "Adding…" : "100k rows"}</span>
             </Button>
           </TooltipTrigger>
-          <TooltipContent>Toggle view sidebar</TooltipContent>
+          <TooltipContent>Add 100,000 fake records</TooltipContent>
         </Tooltip>
-      </TooltipProvider>
 
-      <Separator orientation="vertical" className="mx-2 h-5" />
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 cursor-pointer gap-1"
-          >
-            <Grid className="h-4 w-4 text-blue-600" />
-            <span className="font-normal">{viewName}</span>
-            <ChevronDown className="ml-1 h-4 w-4" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem>
-            <Grid className="mr-2 h-4 w-4 text-blue-600" />
-            <span>Grid view</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <Calendar className="mr-2 h-4 w-4 text-orange-500" />
-            <span>Calendar</span>
-          </DropdownMenuItem>
-          <DropdownMenuItem>
-            <LayoutGrid className="mr-2 h-4 w-4 text-purple-600" />
-            <span>Gallery</span>
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <HideFieldsPopover
-        columns={columns}
-        hiddenColumnIds={config.hiddenColumnIds}
-        onChange={(hiddenColumnIds) => onUpdateConfig({ hiddenColumnIds })}
-      />
-
-      <FilterPopover
-        columns={columns}
-        filters={config.filters}
-        onChange={handleFiltersChange}
-        addRequest={addFilterRequest}
-      />
-
-      <SortPopover
-        columns={columns}
-        sort={displaySort}
-        isPending={isSortPending}
-        onChange={(sort) => onUpdateConfig({ sort })}
-      />
-
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 cursor-pointer gap-1"
-          >
-            <Palette className="h-4 w-4" />
-            <span className="font-normal">Color</span>
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent>
-          <DropdownMenuItem>Color by...</DropdownMenuItem>
-          <DropdownMenuItem>Clear colors</DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-
-      <Button variant="ghost" size="sm" className="h-8 cursor-pointer gap-1">
-        <Share2 className="h-4 w-4" />
-        <span className="font-normal">Share and sync</span>
-      </Button>
-
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 cursor-pointer gap-1"
-        disabled={addRows.isPending}
-        onClick={addRows.add}
-      >
-        <span
-          className={`font-normal ${addRows.isPending ? "animate-pulse" : ""}`}
-        >
-          {addRows.isPending ? "Adding 100k rows..." : "Add 100k rows"}
-        </span>
-      </Button>
-      <div className="ml-auto flex items-center gap-2">
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className={`h-8 w-8 ${searchInput ? "bg-[#fcd66c]/40" : ""}`}
-              aria-label="Search"
-            >
-              <Search className="h-4 w-4" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="mr-5 w-80 p-0">
-            <div>
-              <form
-                className="flex items-center gap-2 border-0 p-2"
-                onSubmit={(e) => e.preventDefault()}
-              >
-                <Input
-                  placeholder="Find in view"
-                  aria-label="Find in view"
-                  maxLength={200}
-                  className="h-10 w-full border-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0"
-                  value={searchInput}
-                  onChange={(e) => onSearchChange(e.target.value)}
-                />
-                <X
-                  aria-label="Clear search"
-                  className="cursor-pointer"
-                  onClick={() => onSearchChange("")}
-                />
-              </form>
-            </div>
-
-            <div className="bg-gray-100 p-4 text-xs text-gray-500">
-              Use advanced search options in the search extension.
-            </div>
-          </PopoverContent>
-        </Popover>
+        <SearchPanel
+          searchInput={searchInput}
+          onSearchChange={onSearchChange}
+          matchCount={searchMatchCount}
+        />
       </div>
       <FetchProgressBar active={isFetching} />
     </div>
