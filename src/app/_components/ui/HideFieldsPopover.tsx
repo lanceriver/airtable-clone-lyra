@@ -23,7 +23,11 @@ type Props = {
   onChange: (hiddenColumnIds: string[]) => void;
 };
 
-export function HideFieldsPopover({ columns, hiddenColumnIds, onChange }: Props) {
+export function HideFieldsPopover({
+  columns,
+  hiddenColumnIds,
+  onChange,
+}: Props) {
   const [query, setQuery] = useState("");
 
   // The first field is the primary field and is always visible.

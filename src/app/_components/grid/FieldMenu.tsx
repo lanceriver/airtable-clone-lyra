@@ -31,7 +31,11 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { api } from "~/trpc/react";
 import { SORT_LABELS } from "../filterOptions";
 import { FIELD_NAME_MAX_LENGTH } from "./gridConstants";

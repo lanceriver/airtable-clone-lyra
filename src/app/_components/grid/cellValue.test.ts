@@ -48,13 +48,20 @@ describe("parseDraft, number", () => {
     expect(parseDraft("   ", "number")).toEqual({ ok: true, value: null });
   });
 
-  it.each(["abc", "-", ".", "1e3", "1.2.3", "0x10", "Infinity", "9".repeat(400)])(
-    "rejects %j",
-    (draft) =>
-      expect(parseDraft(draft, "number")).toEqual({
-        ok: false,
-        error: "Enter a number",
-      }),
+  it.each([
+    "abc",
+    "-",
+    ".",
+    "1e3",
+    "1.2.3",
+    "0x10",
+    "Infinity",
+    "9".repeat(400),
+  ])("rejects %j", (draft) =>
+    expect(parseDraft(draft, "number")).toEqual({
+      ok: false,
+      error: "Enter a number",
+    }),
   );
 });
 

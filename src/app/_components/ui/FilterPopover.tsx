@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import { useEffect, useRef, useState } from "react";
 import { Filter, Plus, TrashIcon } from "lucide-react";
@@ -40,7 +40,10 @@ function toDraft(filter: ViewFilter): DraftFilter {
     id: filter.id,
     columnId: filter.columnId,
     operator: filter.operator,
-    value: filter.value === null || filter.value === undefined ? "" : String(filter.value),
+    value:
+      filter.value === null || filter.value === undefined
+        ? ""
+        : String(filter.value),
   };
 }
 
@@ -56,9 +59,13 @@ function toFilter(draft: DraftFilter, columns: ToolbarColumn[]): ViewFilter {
   };
   const value = draft.value.trim();
   if (!operatorNeedsValue(draft.operator) || value === "") return filter;
-  const isNumber = columns.find((c) => c.id === draft.columnId)?.type === "number";
+  const isNumber =
+    columns.find((c) => c.id === draft.columnId)?.type === "number";
   const numeric = Number(value);
-  return { ...filter, value: isNumber && Number.isFinite(numeric) ? numeric : value };
+  return {
+    ...filter,
+    value: isNumber && Number.isFinite(numeric) ? numeric : value,
+  };
 }
 
 /** Asks the popover to open with a new condition on `columnId`. */
@@ -72,9 +79,16 @@ type Props = {
   addRequest?: AddFilterRequest | null;
 };
 
-export function FilterPopover({ columns, filters, onChange, addRequest }: Props) {
+export function FilterPopover({
+  columns,
+  filters,
+  onChange,
+  addRequest,
+}: Props) {
   const [open, setOpen] = useState(false);
-  const [drafts, setDrafts] = useState<DraftFilter[]>(() => filters.map(toDraft));
+  const [drafts, setDrafts] = useState<DraftFilter[]>(() =>
+    filters.map(toDraft),
+  );
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pending = useRef<(() => void) | null>(null);
 
@@ -152,8 +166,15 @@ export function FilterPopover({ columns, filters, onChange, addRequest }: Props)
     );
   };
 
-  const patchFilter = (id: string, patch: Partial<DraftFilter>, debounce = false) => {
-    update(drafts.map((d) => (d.id === id ? { ...d, ...patch } : d)), debounce);
+  const patchFilter = (
+    id: string,
+    patch: Partial<DraftFilter>,
+    debounce = false,
+  ) => {
+    update(
+      drafts.map((d) => (d.id === id ? { ...d, ...patch } : d)),
+      debounce,
+    );
   };
 
   const changeColumn = (draft: DraftFilter, columnId: string) => {
@@ -167,15 +188,23 @@ export function FilterPopover({ columns, filters, onChange, addRequest }: Props)
   };
 
   const removeFilter = (id: string) => {
-    update(drafts.filter((d) => d.id !== id), false);
+    update(
+      drafts.filter((d) => d.id !== id),
+      false,
+    );
   };
 
-  const activeFields = new Set(drafts.filter(isActive).map((d) => d.columnId)).size;
+  const activeFields = new Set(drafts.filter(isActive).map((d) => d.columnId))
+    .size;
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button variant="ghost" size="sm" className={`cursor-pointer h-8 gap-1 ${activeFields > 0 ? "bg-[#eafbeb]" : ""}`}>
+        <Button
+          variant="ghost"
+          size="sm"
+          className={`h-8 cursor-pointer gap-1 ${activeFields > 0 ? "bg-[#eafbeb]" : ""}`}
+        >
           <Filter className="h-4 w-4" />
           <span className="font-normal">
             {activeFields > 0
@@ -184,7 +213,7 @@ export function FilterPopover({ columns, filters, onChange, addRequest }: Props)
           </span>
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="grid grid-cols-1 gap-y-5 w-150" align="start">
+      <PopoverContent className="grid w-150 grid-cols-1 gap-y-5" align="start">
         <Label>
           {drafts.length === 0
             ? "No filter conditions are applied"
@@ -193,28 +222,49 @@ export function FilterPopover({ columns, filters, onChange, addRequest }: Props)
         {drafts.map((draft, index) => {
           const type = typeOf(draft.columnId);
           return (
-            <div key={draft.id} className="flex flex-row gap-2 items-center" data-testid="filter-row">
-              <span className="w-12 shrink-0 text-sm">{index === 0 ? "Where" : "And"}</span>
-              <Select value={draft.columnId} onValueChange={(value) => changeColumn(draft, value)}>
-                <SelectTrigger className="w-[150px] rounded-none" aria-label="Filter field">
+            <div
+              key={draft.id}
+              className="flex flex-row items-center gap-2"
+              data-testid="filter-row"
+            >
+              <span className="w-12 shrink-0 text-sm">
+                {index === 0 ? "Where" : "And"}
+              </span>
+              <Select
+                value={draft.columnId}
+                onValueChange={(value) => changeColumn(draft, value)}
+              >
+                <SelectTrigger
+                  className="w-[150px] rounded-none"
+                  aria-label="Filter field"
+                >
                   <SelectValue placeholder="Select a column" />
                 </SelectTrigger>
                 <SelectContent>
                   {columns.map((column) => (
-                    <SelectItem key={column.id} value={column.id}>{column.name}</SelectItem>
+                    <SelectItem key={column.id} value={column.id}>
+                      {column.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <Select
                 value={draft.operator}
-                onValueChange={(value) => patchFilter(draft.id, { operator: value as FilterOperator })}
+                onValueChange={(value) =>
+                  patchFilter(draft.id, { operator: value as FilterOperator })
+                }
               >
-                <SelectTrigger className="w-[150px] rounded-none" aria-label="Filter operator">
+                <SelectTrigger
+                  className="w-[150px] rounded-none"
+                  aria-label="Filter operator"
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {operatorsFor(type).map((operator) => (
-                    <SelectItem key={operator} value={operator}>{OPERATOR_LABELS[operator]}</SelectItem>
+                    <SelectItem key={operator} value={operator}>
+                      {OPERATOR_LABELS[operator]}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -222,17 +272,19 @@ export function FilterPopover({ columns, filters, onChange, addRequest }: Props)
                 <Input
                   aria-label="Filter value"
                   placeholder="Enter a value"
-                  className="text-sm rounded-none"
+                  className="rounded-none text-sm"
                   type={type === "number" ? "number" : "text"}
                   step="any"
                   value={draft.value}
-                  onChange={(e) => patchFilter(draft.id, { value: e.target.value }, true)}
+                  onChange={(e) =>
+                    patchFilter(draft.id, { value: e.target.value }, true)
+                  }
                 />
               )}
-              <div className="border ml-auto">
+              <div className="ml-auto border">
                 <TrashIcon
                   aria-label="Remove filter"
-                  className="h-[34px] w-[33px] p-2 hover:text-red-500 cursor-pointer"
+                  className="h-[34px] w-[33px] cursor-pointer p-2 hover:text-red-500"
                   onClick={() => removeFilter(draft.id)}
                 />
               </div>

@@ -4,7 +4,7 @@ import { SignInPage } from "./_components/ui/SignInPage";
 import SuperJSON from "superjson";
 import { auth } from "~/server/auth";
 import { HydrateClient } from "~/trpc/server";
-import { createServerSideHelpers } from '@trpc/react-query/server';
+import { createServerSideHelpers } from "@trpc/react-query/server";
 import { appRouter } from "~/server/api/root";
 import { db } from "~/server/db";
 import { SidebarProvider } from "~/components/ui/sidebar";
@@ -19,30 +19,33 @@ export default async function Home() {
           <SignInPage />
         </main>
       </HydrateClient>
-    )
+    );
   }
 
   const helpers = createServerSideHelpers({
     router: appRouter,
     ctx: { session, db, headers: new Headers() },
-    transformer: SuperJSON
+    transformer: SuperJSON,
   });
 
-  const bases = await helpers.base.list.fetch()
+  const bases = await helpers.base.list.fetch();
 
   return (
     <HydrateClient>
       <SidebarProvider>
-      <main className="text-black flex-1">
-        {session && 
-        <div className="h-screen overflow-hidden">
-          <Navbar userName={session.user?.name ?? ""} userImage={session.user?.image ?? ""}/>
-          <div className="bg-gray-50 min-h-screen">
-            <HomeDashboard initialBases={bases}/>
-          </div>
-        </div>
-        }
-      </main>
+        <main className="flex-1 text-black">
+          {session && (
+            <div className="h-screen overflow-hidden">
+              <Navbar
+                userName={session.user?.name ?? ""}
+                userImage={session.user?.image ?? ""}
+              />
+              <div className="min-h-screen bg-gray-50">
+                <HomeDashboard initialBases={bases} />
+              </div>
+            </div>
+          )}
+        </main>
       </SidebarProvider>
     </HydrateClient>
   );

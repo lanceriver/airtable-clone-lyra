@@ -5,6 +5,9 @@
 import "./src/env.js";
 
 /** @type {import("next").NextConfig} */
-const config = {};
+const config = {
+  // Lets several dev servers run from one checkout, each with its own build dir.
+  distDir: process.env.NEXT_DIST_DIR ?? ".next",
+};
 
 export default config;
