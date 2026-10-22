@@ -1,7 +1,14 @@
 # Handoff — Airtable clone (Lyra take-home → portfolio demo)
 
-Last updated: 2026-10-22, after Phase 3 shipped to production. Next: plan
-Phase 4 on branch `phase-4-extras` (created from `main` at `c661c8f`).
+Last updated: 2026-10-22, after Phase 3 shipped to production.
+
+**Next step:** write `docs/plans/phase-4-extras.md` (the design plus a table of
+atomic tasks), commit it on branch `phase-4-extras` (already created from
+`main`, holding only handoff commits), brief the user, and wait for "go" before
+running agents. All the inputs are below: the scope, the Neon free-tier limits
+(decided: a 200k showcase), the auth and access facts, and the code pointers.
+Ask the user for the current production storage figure from the Neon console;
+it sets the caps.
 
 ## Goal
 Turn the original 2-week Lyra trial (T3 Airtable clone) into a polished
@@ -145,6 +152,32 @@ Worth proposing in the plan (not yet approved):
   Otherwise, ask the user to check it by hand. Firefox's maximum element height
   (about 17.9M px) is why the scroll spacer is capped at 8M px
   (`gridConstants.ts`, `SCROLL_CAP`).
+
+### Code pointers for the plan
+- Every procedure starts with `assertBaseAccess`, `assertTableAccess`,
+  `assertColumnAccess`, `assertViewAccess` or `assertRowAccess`
+  (`src/server/api/access.ts`). Each is a single `findFirst` filtered by
+  `base.ownerId = userId`. A read-only showcase path would branch here, with
+  writes still requiring ownership.
+- Row-adding mutations, all in `src/server/api/routers/`:
+  - `row.ts`: `createRow`, and `addFakeRows` (input `count` ≤ 100k, calls
+    `insertFakeRows` in `src/server/db/fakeRows.ts`);
+  - `table.ts`: `create` (50 seed rows through `createTableWithDefaults` in
+    `src/server/db/tables.ts`);
+  - `base.ts`: `create` (creates a first table).
+  The caps go in these.
+- Auth: `src/server/auth/config.ts` (Google provider, `PrismaAdapter`, database
+  sessions; the `session` callback copies `user.id`) and
+  `src/server/auth/index.ts` (exports `auth`, `handlers`, `signIn`, `signOut`).
+  Sign-in UI: `src/app/_components/auth/` (`SignInPage.tsx`, `actions.ts` with
+  the `signInWithGoogle` server action, and `GoogleSignInButton.tsx`). A guest
+  button fits next to it as a second server action.
+- The `User` model has no guest marker yet (fields: name, email, emailVerified,
+  image). A guest flag or `createdAt` is needed for cleanup, which means a
+  migration.
+- The client shows server errors as toasts (`toast.error(error.message)` in the
+  mutation hooks, e.g. `toolbar/useAddFakeRows.ts`), so cap errors only need a
+  clear message.
 
 ### Known, unreproduced reports from Phase 3
 Agents testing against a shared `next dev` server saw these. Neither reproduced
