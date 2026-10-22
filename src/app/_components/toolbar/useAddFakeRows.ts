@@ -46,7 +46,6 @@ export function useAddFakeRows({
         id: TOAST_ID,
         duration: 4000,
       });
-      void utils.row.getRows.invalidate();
       void utils.row.countRows.invalidate();
       onRowsAdded?.();
     },

@@ -13,9 +13,9 @@ export type ViewConfigPatch = Omit<
 /**
  * Saves part of a view's config. The returned config replaces the cached
  * `view.get` data. Filters and sort change which rows the view shows, so the
- * view's row queries are reset to their first page (their old cursors don't
- * apply to the new result set). Hidden fields, search and column widths are applied to the
- * cache optimistically.
+ * view's row count is refetched (the grid rebuilds its row pages from the saved
+ * filters and sort). Hidden fields, search and column widths are applied to
+ * the cache optimistically.
  *
  * Saves can finish out of order (a sort change waits for its index to build).
  * Each save is numbered, and a response that is older than the newest save
@@ -64,7 +64,6 @@ export function useUpdateViewConfig(viewId: string) {
         );
       }
       if (patch.filters !== undefined || patch.sort !== undefined) {
-        void utils.row.getRows.reset({ viewId });
         void utils.row.countRows.invalidate({ viewId });
       }
     },
