@@ -39,6 +39,7 @@ export function ViewMenu({ baseId, tableId, viewId, viewName }: Props) {
   const [renaming, setRenaming] = useState(false);
   const [draft, setDraft] = useState(viewName);
   // Esc cancels; every other way of closing the popover saves.
+  const inputRef = useRef<HTMLInputElement>(null);
   const cancelled = useRef(false);
   const renameRequested = useRef(false);
 
@@ -46,8 +47,8 @@ export function ViewMenu({ baseId, tableId, viewId, viewName }: Props) {
     cancelled.current = false;
     renameRequested.current = true;
     setDraft(viewName);
-    // Let the menu finish closing, so it doesn't take the focus back.
-    setTimeout(() => setRenaming(true), 0);
+    // The popover opens once the menu has closed (see onCloseAutoFocus), so
+    // the menu doesn't take the focus back.
   };
 
   const finishRename = () => {
@@ -88,6 +89,7 @@ export function ViewMenu({ baseId, tableId, viewId, viewName }: Props) {
             if (renameRequested.current) {
               renameRequested.current = false;
               event.preventDefault();
+              setRenaming(true);
             }
           }}
         >
@@ -113,11 +115,8 @@ export function ViewMenu({ baseId, tableId, viewId, viewName }: Props) {
         }}
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          const input = (event.currentTarget as HTMLElement).querySelector(
-            "input",
-          );
-          input?.focus();
-          input?.select();
+          inputRef.current?.focus();
+          inputRef.current?.select();
         }}
       >
         <form
@@ -127,6 +126,7 @@ export function ViewMenu({ baseId, tableId, viewId, viewName }: Props) {
           }}
         >
           <Input
+            ref={inputRef}
             aria-label="View name"
             value={draft}
             maxLength={100}

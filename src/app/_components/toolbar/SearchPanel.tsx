@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Search, X } from "lucide-react";
 
 import { Button } from "~/components/ui/button";
@@ -37,6 +37,7 @@ export function SearchPanel({
   matchCount,
 }: Props) {
   const [open, setOpen] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
   const active = searchInput !== "";
 
   return (
@@ -60,11 +61,8 @@ export function SearchPanel({
         className="w-80 p-3"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
-          const input = (event.currentTarget as HTMLElement).querySelector(
-            "input",
-          );
-          input?.focus();
-          input?.select();
+          inputRef.current?.focus();
+          inputRef.current?.select();
         }}
       >
         <form
@@ -72,6 +70,7 @@ export function SearchPanel({
           onSubmit={(event) => event.preventDefault()}
         >
           <Input
+            ref={inputRef}
             placeholder="Find in view"
             aria-label="Find in view"
             maxLength={200}
@@ -84,9 +83,9 @@ export function SearchPanel({
             size="icon-sm"
             aria-label="Clear search"
             disabled={!active}
-            onClick={(event) => {
+            onClick={() => {
               onSearchChange("");
-              event.currentTarget.form?.querySelector("input")?.focus();
+              inputRef.current?.focus();
             }}
           >
             <X />

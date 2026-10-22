@@ -105,7 +105,10 @@ export function ViewToolbar({
   const sidebarLabel = sidebarOpen ? "Hide sidebar" : "Show sidebar";
 
   return (
-    <div className="border-at-border relative flex h-12 flex-none items-center gap-0.5 border-b bg-white px-3">
+    <div
+      data-testid="view-toolbar"
+      className="border-at-border relative flex h-12 flex-none items-center gap-0.5 border-b bg-white px-3"
+    >
       <Tooltip>
         <TooltipTrigger asChild>
           <Button
@@ -168,6 +171,7 @@ export function ViewToolbar({
             <Button
               variant="toolbar"
               size="toolbar"
+              className="disabled:opacity-100"
               disabled={addRows.isPending}
               onClick={addRows.add}
             >
