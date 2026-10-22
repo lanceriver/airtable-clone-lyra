@@ -28,16 +28,14 @@ export function CreateGridDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[400px]">
-        {/* Remounts on every open, so the field starts at the suggested name. */}
-        {open && (
-          <CreateGridForm
-            defaultName={defaultName}
-            isCreating={isCreating}
-            onCancel={() => onOpenChange(false)}
-            onCreate={onCreate}
-          />
-        )}
+      <DialogContent className="sm:max-w-[400px]" aria-describedby={undefined}>
+        {/* The content unmounts when closed, so every open starts afresh. */}
+        <CreateGridForm
+          defaultName={defaultName}
+          isCreating={isCreating}
+          onCancel={() => onOpenChange(false)}
+          onCreate={onCreate}
+        />
       </DialogContent>
     </Dialog>
   );

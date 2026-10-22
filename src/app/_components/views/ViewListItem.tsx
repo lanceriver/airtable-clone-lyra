@@ -39,9 +39,10 @@ export function ViewListItem({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(name);
-  // Set when a menu item starts a rename, so the closing menu doesn't hand
-  // focus back to its trigger and blur (and so save) the new input.
-  const keepFocus = useRef(false);
+  // Set when a menu item asks for a rename. The input appears only once the
+  // menu has finished closing: the menu moves focus around while it closes,
+  // which would otherwise take focus from the new input (and so save it).
+  const pendingRename = useRef(false);
   const rowRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -59,8 +60,7 @@ export function ViewListItem({
     <>
       <Item
         onSelect={() => {
-          keepFocus.current = true;
-          startRename();
+          pendingRename.current = true;
         }}
       >
         <Pencil />
@@ -74,9 +74,10 @@ export function ViewListItem({
   );
 
   const onCloseAutoFocus = (e: Event) => {
-    if (keepFocus.current) {
+    if (pendingRename.current) {
       e.preventDefault();
-      keepFocus.current = false;
+      pendingRename.current = false;
+      startRename();
     }
   };
 
