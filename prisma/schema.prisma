@@ -57,6 +57,7 @@ model User {
 model Base {
     id        String   @id @default(cuid())
     name      String
+    color     String   @default("blue")
     ownerId   String
     owner    User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
     createdAt DateTime @default(now())

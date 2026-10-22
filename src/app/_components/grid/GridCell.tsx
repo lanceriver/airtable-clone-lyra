@@ -6,15 +6,23 @@ import type { GridColumn } from "./gridTypes";
 export const PRIMARY_SHADOW_CLASS =
   "group-data-[hscrolled=true]/grid:shadow-[2px_0_3px_-1px_rgba(0,0,0,0.18)]";
 
+/** The primary field's divider, a shade darker than the other grid lines. */
+export const PRIMARY_BORDER_CLASS = "border-r-[#c8ccd1]";
+
 /**
- * Background for a body cell: search match, then filtered column, then sorted
- * column. Sticky cells need an opaque background, hence the white default.
+ * Background for a body cell: search match, then sorted column (which wins
+ * over a filter on the same column), then filtered column. Sticky cells need
+ * an opaque background, hence the white default. Hovering the row
+ * (`group/row` on GridRow) darkens the background with plain CSS, so no row
+ * re-renders on pointer moves.
  */
 function cellBackground(column: GridColumn, matchesSearch: boolean): string {
   if (matchesSearch) return "bg-[#fff3b0]";
-  if (column.filtered) return "bg-[#e8f7ea]";
-  if (column.sortDirection) return "bg-[#fff2ea]";
-  return "bg-white";
+  if (column.sortDirection) {
+    return "bg-at-sort-col group-hover/row:bg-[#ffeddf]";
+  }
+  if (column.filtered) return "bg-at-filter-col group-hover/row:bg-[#e2f8e4]";
+  return "bg-white group-hover/row:bg-[#f8f8f8]";
 }
 
 export function displayValue(value: string | number | undefined): string {
@@ -40,7 +48,7 @@ type GridCellProps = {
 };
 
 /** Inset, so the outline never overlaps the neighbouring cells. */
-const ACTIVE_CLASS = "outline-2 -outline-offset-2 outline-[#166ee1]";
+const ACTIVE_CLASS = "outline-2 -outline-offset-2 outline-at-blue";
 /** The editor input draws the outline itself; it is positioned in the cell. */
 const EDITING_CLASS = "bg-white!";
 
@@ -62,8 +70,10 @@ export function GridCell({
   isEditing,
 }: GridCellProps) {
   const base =
-    "h-8 flex-none box-border border-b border-r border-[#dfe2e4] px-2 flex items-center";
-  const sticky = column.isPrimary ? `sticky z-10 ${PRIMARY_SHADOW_CLASS}` : "";
+    "h-8 flex-none box-border border-b border-r border-at-grid-line px-2 flex items-center";
+  const sticky = column.isPrimary
+    ? `sticky z-10 ${PRIMARY_BORDER_CLASS} ${PRIMARY_SHADOW_CLASS}`
+    : "";
   const activeClass = isEditing ? EDITING_CLASS : isActive ? ACTIVE_CLASS : "";
   // The editor and its message are positioned against the cell (sticky cells
   // already are positioned).

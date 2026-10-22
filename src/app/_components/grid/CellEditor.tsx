@@ -31,7 +31,7 @@ type CellEditorProps = {
   value: CellValue;
 };
 
-const BLUE = "outline-[#166ee1]";
+const BLUE = "outline-at-blue";
 const RED = "outline-[#d4351c]";
 
 /**
@@ -44,7 +44,12 @@ const RED = "outline-[#d4351c]";
  * A number that isn't one stays open with a message (when leaving by click,
  * it is dropped instead, since the click already moved on).
  */
-export function CellEditor({ rowIndex, rowId, column, value }: CellEditorProps) {
+export function CellEditor({
+  rowIndex,
+  rowId,
+  column,
+  value,
+}: CellEditorProps) {
   const { state, dispatch, setCell, focusGrid } = useGridSelection();
   const isNumber = column.type === "number";
 
@@ -197,7 +202,7 @@ export function CellEditor({ rowIndex, rowId, column, value }: CellEditorProps) 
         autoComplete="off"
         spellCheck={false}
         inputMode={isNumber ? "decimal" : undefined}
-        className={`absolute top-0 left-0 -right-px -bottom-px box-border min-w-0 border-0 bg-white px-2 outline-[3px] -outline-offset-[3px] select-text ${
+        className={`absolute top-0 -right-px -bottom-px left-0 box-border min-w-0 border-0 bg-white px-2 outline-[3px] -outline-offset-[3px] select-text ${
           showError ? RED : BLUE
         } ${isNumber ? "text-right tabular-nums" : ""}`}
       />

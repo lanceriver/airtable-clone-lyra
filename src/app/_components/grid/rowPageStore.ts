@@ -245,6 +245,36 @@ export class RowPageStore {
     return this.inFlight.size > 0;
   }
 
+  /** The range of the last `ensureRange` call, or null if there was none. */
+  get lastRange(): RowRange | null {
+    return this.hasRange ? { ...this.range } : null;
+  }
+
+  /** True while a page's last fetch has failed and has not been retried yet. */
+  get hasFailedPages(): boolean {
+    return this.failed.size > 0;
+  }
+
+  /**
+   * True when every page of `range` (clamped to the total, if known) is
+   * cached. Pages after the end of the data (behind a page with no
+   * `nextCursor`) don't exist, so they count as loaded.
+   */
+  isRangeLoaded(range: RowRange): boolean {
+    for (const k of pagesInRange(range, this.pageSize, this.total)) {
+      if (this.pages.has(k)) continue;
+      let pastTheEnd = false;
+      for (const [j, page] of this.pages) {
+        if (j < k && page.nextCursor === null) {
+          pastTheEnd = true;
+          break;
+        }
+      }
+      if (!pastTheEnd) return false;
+    }
+    return true;
+  }
+
   /** Number of cached pages (for tests and diagnostics). */
   get cachedPageCount(): number {
     return this.pages.size;
@@ -273,13 +303,18 @@ export class RowPageStore {
 
   /**
    * The grid calls this on scroll with the visible rows plus overscan.
-   * Fetches what's missing; an offset fetch waits until calls stop coming.
+   * Fetches what's missing; an offset fetch waits until calls stop coming,
+   * unless `immediate` is set (a one-off range, such as priming a store).
    */
-  ensureRange(startIndex: number, endIndex: number): void {
+  ensureRange(
+    startIndex: number,
+    endIndex: number,
+    options?: { immediate?: boolean },
+  ): void {
     if (this.disposed) return;
     this.range = { start: startIndex, end: endIndex };
     this.hasRange = true;
-    this.replan("scroll");
+    this.replan(options?.immediate ? "timer" : "scroll");
     this.flush();
   }
 

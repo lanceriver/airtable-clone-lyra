@@ -31,7 +31,11 @@ import {
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
 import { Input } from "~/components/ui/input";
-import { Tooltip, TooltipContent, TooltipTrigger } from "~/components/ui/tooltip";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "~/components/ui/tooltip";
 import { api } from "~/trpc/react";
 import { SORT_LABELS } from "../filterOptions";
 import { FIELD_NAME_MAX_LENGTH } from "./gridConstants";
@@ -74,7 +78,7 @@ export function FieldMenu({ column, open, onOpenChange }: FieldMenuProps) {
             type="button"
             aria-label={`${column.name} field menu`}
             data-testid="field-menu-trigger"
-            className="flex h-5 w-5 flex-none cursor-pointer items-center justify-center rounded text-[#616670] opacity-0 outline-none group-hover/header:opacity-100 hover:bg-black/10 focus-visible:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100"
+            className="text-at-text-muted flex h-5 w-5 flex-none cursor-pointer items-center justify-center rounded opacity-0 outline-none group-hover/header:opacity-100 hover:bg-black/10 focus-visible:opacity-100 data-[state=open]:opacity-100 [@media(hover:none)]:opacity-100"
             onDoubleClick={(event) => event.stopPropagation()}
           >
             <ChevronDown className="h-4 w-4" aria-hidden />

@@ -86,38 +86,36 @@ export function useCellEditing(
         if (rowPending.size === 0) pending.delete(row.id);
       };
 
-      client.row.updateCell
-        .mutate({ rowId: row.id, columnId, value })
-        .then(
-          (saved) => {
-            settle();
-            // Other saves of this row are still in flight: the server record
-            // doesn't have them yet.
-            let merged = saved;
-            for (const [otherId, other] of rowPending) {
-              merged = withCellValue(merged, otherId, other.value);
+      client.row.updateCell.mutate({ rowId: row.id, columnId, value }).then(
+        (saved) => {
+          settle();
+          // Other saves of this row are still in flight: the server record
+          // doesn't have them yet.
+          let merged = saved;
+          for (const [otherId, other] of rowPending) {
+            merged = withCellValue(merged, otherId, other.value);
+          }
+          pagesRef.current.patchRow(merged);
+        },
+        (error: unknown) => {
+          // A newer save of the same cell decides what the cell shows.
+          const superseded = rowPending.get(columnId)?.seq !== save.seq;
+          settle();
+          if (!superseded) {
+            const current = pagesRef.current.getRow(rowIndex);
+            if (current?.id === row.id) {
+              pagesRef.current.patchRow(
+                withCellValue(current, columnId, save.previous ?? null),
+              );
             }
-            pagesRef.current.patchRow(merged);
-          },
-          (error: unknown) => {
-            // A newer save of the same cell decides what the cell shows.
-            const superseded = rowPending.get(columnId)?.seq !== save.seq;
-            settle();
-            if (!superseded) {
-              const current = pagesRef.current.getRow(rowIndex);
-              if (current?.id === row.id) {
-                pagesRef.current.patchRow(
-                  withCellValue(current, columnId, save.previous ?? null),
-                );
-              }
-            }
-            toast.error(
-              error instanceof Error && error.message !== ""
-                ? error.message
-                : "Couldn't save the change",
-            );
-          },
-        );
+          }
+          toast.error(
+            error instanceof Error && error.message !== ""
+              ? error.message
+              : "Couldn't save the change",
+          );
+        },
+      );
     },
     [client],
   );

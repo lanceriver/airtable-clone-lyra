@@ -67,15 +67,11 @@ export type GridProps = {
   sort: ViewSort;
   /** Fields that have a filter, for their tint. */
   filteredColumnIds: string[];
-  /** The (debounced) search text; matching cells are highlighted. */
-  search: string;
-  rowPages: RowPages;
   /**
-   * The grid scrolls back to the top when this or the search changes (the
-   * filters and sort, as a string). Adding or deleting a record keeps the
-   * scroll position.
+   * The rows. Matching cells are highlighted for `rowPages.resultSearch`, and
+   * the grid scrolls back to the top when `rowPages.resultKey` changes.
    */
-  scrollResetKey: string;
+  rowPages: RowPages;
   /** Empty-state button: clears the search text and the view's filters. */
   onClearFilters: () => void;
 };
@@ -93,9 +89,7 @@ export function Grid({
   hiddenColumnIds,
   sort,
   filteredColumnIds,
-  search,
   rowPages,
-  scrollResetKey,
   onClearFilters,
 }: GridProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -180,11 +174,14 @@ export function Grid({
     );
   }, [ensureRange, total, firstVisible, lastVisible]);
 
-  // A different result set starts at the top. The row count is not a reason:
-  // adding and deleting records keep the scroll position.
-  useEffect(() => {
+  // A different result set starts at the top. `resultKey` changes in the same
+  // render as the rows of a new search, filter or sort, so the scroll happens
+  // in the frame that shows them. The row count is not a reason: adding and
+  // deleting records keep the scroll position.
+  const { resultKey, resultSearch } = rowPages;
+  useLayoutEffect(() => {
     scrollRef.current?.scrollTo({ top: 0 });
-  }, [scrollResetKey, search]);
+  }, [resultKey]);
 
   // -- Selection and keyboard ---------------------------------------------------
   const rowCount = total ?? 0;
@@ -196,11 +193,11 @@ export function Grid({
   useEffect(() => {
     dispatch({ type: "clamp" });
   }, [dispatch, rowCount, colCount]);
-  // A different result set (the page cache is rebuilt) or table: the row
+  // A different result set (the shown rows were swapped) or table: the row
   // indexes mean something else now.
-  useEffect(() => {
+  useLayoutEffect(() => {
     dispatch({ type: "clear" });
-  }, [dispatch, tableId, scrollResetKey, search]);
+  }, [dispatch, tableId, resultKey]);
 
   const canEdit = useCallback(
     (rowIndex: number) => getRow(rowIndex) !== undefined,
@@ -347,7 +344,7 @@ export function Grid({
     ? Math.floor(firstItem.index / ANCHOR_BLOCK) * ANCHOR_BLOCK
     : 0;
 
-  const searchLower = search.toLowerCase();
+  const searchLower = resultSearch.toLowerCase();
 
   const emptyView = total === 0 && rowPages.totalUnfiltered !== undefined;
 

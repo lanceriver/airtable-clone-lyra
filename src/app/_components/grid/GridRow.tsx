@@ -27,7 +27,9 @@ export type GridRowProps = {
 };
 
 /**
- * One row of the grid. Memoized: it re-renders only when its row, the
+ * One row of the grid. The row element is the hover target (`group/row`):
+ * the row number and every cell darken through CSS, with no React state.
+ * Memoized: it re-renders only when its row, the
  * columns, the width or the search change, not on scroll or unrelated state.
  * `top` is relative to the rows layer, which GridBody moves on scroll.
  */
@@ -48,7 +50,7 @@ export const GridRow = memo(function GridRow({
       role="row"
       aria-rowindex={index + 2}
       data-row-index={index}
-      className="absolute top-0 left-0 flex"
+      className="group/row absolute top-0 left-0 flex"
       style={{
         width,
         height: ROW_HEIGHT,
@@ -60,8 +62,8 @@ export const GridRow = memo(function GridRow({
     >
       <div
         role="rowheader"
-        className={`sticky left-0 z-10 box-border flex h-8 flex-none items-center border-r border-b border-[#dfe2e4] px-2 text-left text-[12px] ${
-          isActiveRow ? "bg-[#eceef0] text-[#1d1f25]" : "bg-white text-[#666]"
+        className={`border-at-grid-line sticky left-0 z-10 box-border flex h-8 flex-none items-center overflow-hidden border-r border-b bg-white pr-1 pl-4 text-left text-[12px] group-hover/row:bg-[#f8f8f8] ${
+          isActiveRow ? "text-at-text" : "text-at-text-subtle"
         }`}
         style={{ width: ROW_NUMBER_WIDTH }}
       >

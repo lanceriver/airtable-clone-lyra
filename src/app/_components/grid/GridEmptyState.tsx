@@ -1,5 +1,6 @@
 import { Plus } from "lucide-react";
 
+import { Button } from "~/components/ui/button";
 import { HEADER_HEIGHT } from "./gridConstants";
 
 type GridEmptyStateProps = {
@@ -26,24 +27,24 @@ export function GridEmptyState({
       style={{ top: HEADER_HEIGHT + 1 }}
       data-testid={tableEmpty ? "grid-empty-table" : "grid-empty-view"}
     >
-      <p className="text-[15px] text-[#616670]">
+      <p className="text-at-text-muted text-[13px]">
         {tableEmpty ? "No records yet" : "No records match this view"}
       </p>
-      <button
+      <Button
         type="button"
         disabled={tableEmpty && adding}
         onClick={tableEmpty ? onAddRecord : onClearFilters}
-        className="pointer-events-auto flex h-8 cursor-pointer items-center gap-1 rounded-md border border-[#dfe2e4] bg-white px-3 text-[13px] text-[#1d1f25] shadow-xs hover:bg-[#f2f4f8] focus-visible:ring-2 focus-visible:ring-[#166ee1] focus-visible:outline-none disabled:cursor-default disabled:opacity-60"
+        className="pointer-events-auto"
       >
         {tableEmpty ? (
           <>
-            <Plus className="size-[13px]" aria-hidden />
+            <Plus aria-hidden />
             Add a record
           </>
         ) : (
           "Clear search and filters"
         )}
-      </button>
+      </Button>
     </div>
   );
 }

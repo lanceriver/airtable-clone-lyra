@@ -233,8 +233,12 @@ describe("view.updateConfig", () => {
     });
     expect(config.hiddenColumnIds).toEqual([email.id, score.id]);
     expect(
-      (await caller.updateConfig({ viewId: base.viewId, hiddenColumnIds: [name.id] }))
-        .hiddenColumnIds,
+      (
+        await caller.updateConfig({
+          viewId: base.viewId,
+          hiddenColumnIds: [name.id],
+        })
+      ).hiddenColumnIds,
     ).toEqual([]);
   });
 
@@ -382,15 +386,18 @@ describe("view.updateConfig columnWidths", () => {
       columnWidths: { [name.id]: 300 },
     });
     expect(config.columnWidths).toEqual({ [name.id]: 300 });
-    expect((await caller.get({ viewId: base.viewId })).config.columnWidths).toEqual(
-      { [name.id]: 300 },
-    );
+    expect(
+      (await caller.get({ viewId: base.viewId })).config.columnWidths,
+    ).toEqual({ [name.id]: 300 });
 
     // Updates without widths keep them.
     config = await caller.updateConfig({ viewId: base.viewId, search: "" });
     expect(config.columnWidths).toEqual({ [name.id]: 300 });
 
-    config = await caller.updateConfig({ viewId: base.viewId, columnWidths: {} });
+    config = await caller.updateConfig({
+      viewId: base.viewId,
+      columnWidths: {},
+    });
     expect(config.columnWidths).toEqual({});
   });
 
@@ -454,9 +461,9 @@ describe("view.updateConfig columnWidths", () => {
         columnWidths: { [name.id]: "x", [email.id]: 9999, z: 50.4, n: null },
       },
     });
-    expect((await caller.get({ viewId: base.viewId })).config.columnWidths).toEqual(
-      { [email.id]: 800, z: 100 },
-    );
+    expect(
+      (await caller.get({ viewId: base.viewId })).config.columnWidths,
+    ).toEqual({ [email.id]: 800, z: 100 });
     for (const bad of [[1, 2], "str", 5, null]) {
       await testDb.$executeRaw`UPDATE "views" SET "columnWidths" = ${JSON.stringify(bad)}::jsonb WHERE id = ${base.viewId}`;
       expect(

@@ -647,4 +647,68 @@ describe("RowPageStore", () => {
       "forward",
     ]);
   });
+  it("lastRange is null until ensureRange is called, then the latest range", () => {
+    const { store } = setup();
+    expect(store.lastRange).toBeNull();
+    store.ensureRange(10, 70);
+    expect(store.lastRange).toEqual({ start: 10, end: 70 });
+    store.ensureRange(0, 20);
+    expect(store.lastRange).toEqual({ start: 0, end: 20 });
+  });
+
+  it("isRangeLoaded is true once every page of the range is cached", async () => {
+    const { server, store } = setup(1000);
+    const range = { start: 0, end: 250 };
+    expect(store.isRangeLoaded(range)).toBe(false);
+    store.ensureRange(range.start, range.end);
+    await server.releaseOne();
+    expect(store.isRangeLoaded(range)).toBe(false); // page 0 only
+    await server.flush();
+    expect(store.isRangeLoaded(range)).toBe(true);
+    expect(store.isRangeLoaded({ start: 0, end: 350 })).toBe(false);
+  });
+
+  it("isRangeLoaded clamps to the total and ignores pages past the end", async () => {
+    const { server, store } = setup(130);
+    store.ensureRange(0, 450);
+    await server.flush();
+    // Pages 0 and 1 exist; 2..4 are past the total.
+    expect(store.isRangeLoaded({ start: 0, end: 450 })).toBe(true);
+
+    // With no total yet, the last page tells where the data ends.
+    const server2 = makeFetcher(130);
+    const open = new RowPageStore({
+      pageSize: PAGE,
+      fetchPage: server2.fetchPage,
+    });
+    expect(open.isRangeLoaded({ start: 0, end: 450 })).toBe(false);
+    open.ensureRange(0, 450);
+    await server2.flush();
+    expect(open.isRangeLoaded({ start: 0, end: 450 })).toBe(true);
+  });
+
+  it("isRangeLoaded is true for an empty view", () => {
+    const { store } = setup(0);
+    expect(store.isRangeLoaded({ start: 0, end: 99 })).toBe(true);
+  });
+
+  it("hasFailedPages is set by a failed fetch and cleared when the retry lands", async () => {
+    const { server, store } = setup(100_000, { retryDelayMs: 1000 });
+    expect(store.hasFailedPages).toBe(false);
+    store.ensureRange(0, 60);
+    await server.failOne();
+    expect(store.hasFailedPages).toBe(true);
+    await vi.advanceTimersByTimeAsync(1000);
+    await server.flush();
+    expect(store.hasFailedPages).toBe(false);
+    expect(store.isLoaded(0)).toBe(true);
+  });
+
+  it("immediate ensureRange fetches a detached page without the debounce", async () => {
+    const { server, store } = setup();
+    store.ensureRange(4950, 4990, { immediate: true });
+    expect(server.requests).toEqual([{ kind: "offset", offset: 4900 }]);
+    await server.flush();
+    expect(store.isRangeLoaded({ start: 4950, end: 4990 })).toBe(true);
+  });
 });

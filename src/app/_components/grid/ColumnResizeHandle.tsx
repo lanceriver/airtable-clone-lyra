@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 
-import { DEFAULT_COLUMN_WIDTH, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH } from "./gridConstants";
+import {
+  DEFAULT_COLUMN_WIDTH,
+  MAX_COLUMN_WIDTH,
+  MIN_COLUMN_WIDTH,
+} from "./gridConstants";
 import type { GridColumn } from "./gridTypes";
 import { useGridColumnTools } from "./GridColumnTools";
 

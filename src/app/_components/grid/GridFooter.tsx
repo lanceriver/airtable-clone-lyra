@@ -1,8 +1,8 @@
 import { Loader2, Plus } from "lucide-react";
 
-import { GRID_LINE_COLOR } from "./gridConstants";
+import { Button } from "~/components/ui/button";
 
-export const FOOTER_HEIGHT = 32;
+export const FOOTER_HEIGHT = 34;
 
 type GridFooterProps = {
   /** Rows in the view, and in the table; undefined until counted. */
@@ -37,30 +37,31 @@ export function GridFooter({
   return (
     <div
       data-testid="grid-footer"
-      className="box-border flex flex-none items-center justify-between border-t bg-white px-1 text-[13px] text-[#1d1f25]"
-      style={{ height: FOOTER_HEIGHT, borderTopColor: GRID_LINE_COLOR }}
+      className="border-at-border box-border flex flex-none items-center justify-between border-t bg-white px-2"
+      style={{ height: FOOTER_HEIGHT }}
     >
-      <button
+      <Button
         type="button"
+        variant="ghost"
+        size="sm"
         data-testid="add-record"
         disabled={adding || total === undefined}
         onClick={onAddRecord}
-        className="flex h-6 cursor-pointer items-center gap-1 rounded px-2 text-[13px] text-[#1d1f25] hover:bg-[#f2f4f8] focus-visible:ring-2 focus-visible:ring-[#166ee1] focus-visible:outline-none disabled:cursor-default disabled:opacity-60"
       >
         {adding ? (
-          <Loader2 className="size-[13px] animate-spin" aria-hidden />
+          <Loader2 className="animate-spin" aria-hidden />
         ) : (
-          <Plus className="size-[13px]" aria-hidden />
+          <Plus aria-hidden />
         )}
         Add record
-      </button>
+      </Button>
       <div
-        className="flex items-center gap-2 px-2 text-[13px] text-[#616670]"
+        className="text-at-text-muted flex items-center gap-2 px-2 text-xs"
         aria-live="polite"
       >
         {isFetching && (
           <Loader2
-            className="size-3 animate-spin text-[#9aa0a6]"
+            className="text-at-text-subtle size-3 animate-spin"
             aria-label="Loading"
             data-testid="footer-spinner"
           />

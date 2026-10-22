@@ -185,7 +185,9 @@ export const viewRouter = createTRPCRouter({
         const primaryId = columns[0]?.id;
         data.hiddenColumnIds = [
           ...new Set(
-            input.hiddenColumnIds.filter((id) => byId.has(id) && id !== primaryId),
+            input.hiddenColumnIds.filter(
+              (id) => byId.has(id) && id !== primaryId,
+            ),
           ),
         ];
       }
