@@ -1,9 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { api } from "~/trpc/react";
-import { toast } from "sonner";
 import {
   Calendar,
   LayoutGrid,
@@ -29,6 +26,8 @@ import {
   ContextMenuTrigger,
 } from "~/components/ui/context-menu";
 
+import { useViewActions } from "./useViewActions";
+
 export type ViewsSidebarProps = {
   baseId: string;
   tableId: string;
@@ -40,78 +39,29 @@ export function ViewsSidebar({
   tableId,
   activeViewId,
 }: ViewsSidebarProps) {
-  const utils = api.useUtils();
-  const router = useRouter();
-
   const [createExpanded, setCreateExpanded] = useState(true);
   const [createOpen, setCreateOpen] = useState(false);
   const [viewName, setViewName] = useState("");
   const [editingViewId, setEditingViewId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
 
-  const goToView = (viewId: string) => {
-    router.push(`/${baseId}/${tableId}?viewId=${viewId}`);
-  };
-
-  const { data: views } = api.view.list.useQuery({ tableId });
-
-  const { mutate: createView } = api.view.create.useMutation({
-    onSuccess: async (newView) => {
-      await Promise.all([
-        utils.view.list.invalidate({ tableId }),
-        utils.table.get.invalidate({ tableId }),
-      ]);
-      setCreateOpen(false);
-      setViewName("");
-      goToView(newView.id);
-      toast.success(`View "${newView.name}" created successfully!`);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const { mutate: renameView } = api.view.rename.useMutation({
-    onSuccess: (view) => {
-      void utils.view.list.invalidate({ tableId });
-      void utils.table.get.invalidate({ tableId });
-      void utils.view.get.invalidate({ viewId: view.id });
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
-
-  const { mutate: deleteView } = api.view.delete.useMutation({
-    onSuccess: async (deleted) => {
-      await Promise.all([
-        utils.view.list.invalidate({ tableId }),
-        utils.table.get.invalidate({ tableId }),
-      ]);
-      if (deleted.id === activeViewId) {
-        const next = views?.find((view) => view.id !== deleted.id);
-        if (next) goToView(next.id);
-      }
-      toast.success(`View deleted successfully!`);
-    },
-    onError: (error) => {
-      toast.error(error.message);
-    },
-  });
+  const { views, goToView, createView, renameView, deleteView } =
+    useViewActions({ baseId, tableId, activeViewId });
 
   const commitRename = () => {
-    const name = editName.trim();
-    const current = views?.find((view) => view.id === editingViewId);
-    if (editingViewId && name !== "" && name !== current?.name) {
-      renameView({ viewId: editingViewId, name });
-    }
+    if (editingViewId) renameView(editingViewId, editName);
     setEditingViewId(null);
     setEditName("");
   };
 
   const handleCreate = (e: React.FormEvent) => {
     e.preventDefault();
-    createView({ tableId, name: viewName.trim() || undefined });
+    createView(viewName, {
+      onSuccess: () => {
+        setCreateOpen(false);
+        setViewName("");
+      },
+    });
   };
 
   return (
@@ -169,7 +119,7 @@ export function ViewsSidebar({
                   </ContextMenuItem>
                   <ContextMenuItem
                     disabled={views.length <= 1}
-                    onClick={() => deleteView({ viewId: view.id })}
+                    onClick={() => deleteView(view.id)}
                   >
                     Delete view
                   </ContextMenuItem>
