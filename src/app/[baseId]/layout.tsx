@@ -33,7 +33,8 @@ export default async function BaseLayout({
     <div className="flex h-screen overflow-hidden">
       <BaseRail
         userName={session.user.name ?? ""}
-        userImage={session.user.image ?? ""}
+        userEmail={session.user.email}
+        userImage={session.user.image}
       />
       <div className="flex min-w-0 flex-1 flex-col">
         <BaseHeader baseId={base.id} baseName={base.name} color={base.color} />
