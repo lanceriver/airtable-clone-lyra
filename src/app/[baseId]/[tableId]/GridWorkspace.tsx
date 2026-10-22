@@ -106,6 +106,7 @@ export function GridWorkspace({ baseId, table, view }: WorkspaceProps) {
                 searchInput={searchInput}
                 onSearchChange={setSearchInput}
                 onRowsAdded={rowPages.reset}
+                isFetching={rowPages.isFetching}
                 addFilterRequest={addFilterRequest}
             >
                 <FillViewportHeight>
