@@ -14,6 +14,7 @@ scrollbar can be dragged straight to the last row.
 |---|---|
 | ![Home](docs/images/home.png) | ![A 1,000,000-row table](docs/images/base.png) |
 | ![Filter and sort](docs/images/filter-sort.png) | ![Search](docs/images/search.png) |
+| ![Sort](docs/images/sort.png) | ![Sign-in](docs/images/signin.png) |
 
 It started as a two-week take-home and was then rebuilt in three planned
 phases (data layer, grid, visual polish). See [How it was built](#how-it-was-built).
