@@ -4,8 +4,10 @@ import { assertBaseAccess } from "~/server/api/access";
 import { createTRPCRouter, protectedProcedure } from "~/server/api/trpc";
 import { dropSortIndexes } from "~/server/db/rows";
 import { createTableWithDefaults } from "~/server/db/tables";
+import { BASE_COLORS, getBaseColor, randomBaseColor } from "~/lib/baseColors";
 
 const nameSchema = z.string().trim().min(1).max(100);
+const colorSchema = z.enum(BASE_COLORS);
 
 export const baseRouter = createTRPCRouter({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -30,6 +32,7 @@ export const baseRouter = createTRPCRouter({
     return bases.map((b) => ({
       id: b.id,
       name: b.name,
+      color: getBaseColor(b.color).name,
       createdAt: b.createdAt,
       updatedAt: b.updatedAt,
       firstTableId: b.tables[0]?.id ?? null,
@@ -38,11 +41,16 @@ export const baseRouter = createTRPCRouter({
   }),
 
   create: protectedProcedure
-    .input(z.object({ name: nameSchema.optional() }).optional())
+    .input(
+      z
+        .object({ name: nameSchema.optional(), color: colorSchema.optional() })
+        .optional(),
+    )
     .mutation(async ({ ctx, input }) => {
       const base = await ctx.db.base.create({
         data: {
           name: input?.name ?? "Untitled Base",
+          color: input?.color ?? randomBaseColor(),
           ownerId: ctx.session.user.id,
         },
       });
@@ -51,7 +59,13 @@ export const baseRouter = createTRPCRouter({
           baseId: base.id,
           name: "Table 1",
         });
-        return { id: base.id, name: base.name, tableId: table.id, viewId };
+        return {
+          id: base.id,
+          name: base.name,
+          color: getBaseColor(base.color).name,
+          tableId: table.id,
+          viewId,
+        };
       } catch (e) {
         await ctx.db.base.delete({ where: { id: base.id } }).catch(() => null);
         throw e;
@@ -66,6 +80,17 @@ export const baseRouter = createTRPCRouter({
         where: { id: input.baseId },
         data: { name: input.name },
         select: { id: true, name: true },
+      });
+    }),
+
+  setColor: protectedProcedure
+    .input(z.object({ baseId: z.string(), color: colorSchema }))
+    .mutation(async ({ ctx, input }) => {
+      await assertBaseAccess(ctx.db, ctx.session.user.id, input.baseId);
+      return ctx.db.base.update({
+        where: { id: input.baseId },
+        data: { color: input.color },
+        select: { id: true, color: true },
       });
     }),
 
